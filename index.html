@@ -670,6 +670,7 @@ const ui = {
   horizon: +pref('horizon', 20),
   histSel: null,
   histEdition: false,
+  sauvegardes: null,   // liste des sauvegardes automatiques (chargée à la demande)
   maj: null,           // brouillon de la mise à jour mensuelle
 };
 let state = null;      // { comptes, credits, snapshots, reglages }
@@ -692,16 +693,23 @@ function messageErreur(e) {
   return (e && e.message) || String(e);
 }
 // Toute écriture passe par ici : l'échec est toujours affiché, jamais silencieux.
+// Avant une écriture importante : si les données viennent seulement du cache de l'appareil
+// (réseau lent ou absent), on prévient qu'elles peuvent dater de la dernière synchronisation.
+async function confirmerSiNonSynchronise(action) {
+  if (!store || store.estSynchronise()) return true;
+  return confirmer('Données pas encore synchronisées', `Firebase n’a pas encore confirmé les données de cet appareil (réseau lent ou absent) : ce qui est affiché peut dater de ta dernière connexion ici.<br><br>${action} quand même ? Tes modifications seront envoyées dès que la connexion revient.`, 'Continuer');
+}
 function ecrire(promesse) {
   return Promise.resolve(promesse).catch(e => { console.error(e); toast('Échec de l’enregistrement : ' + messageErreur(e), 'erreur'); throw e; });
 }
 function statut({ etat, message }) {
   const el = $('#statut');
-  const libelles = { local: 'Mode local', ok: 'Synchronisé', attente: 'Enregistrement…', horsligne: 'Hors ligne', erreur: 'Erreur de synchro' };
-  el.className = 'statut ' + (etat === 'horsligne' ? 'attente' : etat);
+  const libelles = { local: 'Mode local', ok: 'Synchronisé', attente: 'Enregistrement…', synchro: 'Connexion…', horsligne: 'Hors ligne', erreur: 'Erreur de synchro' };
+  el.className = 'statut ' + (etat === 'horsligne' || etat === 'synchro' ? 'attente' : etat);
   el.textContent = libelles[etat] || '';
   el.title = etat === 'local' ? 'Données enregistrées dans ce navigateur uniquement (Firebase non configuré).'
-    : etat === 'horsligne' ? 'Les modifications seront envoyées au retour du réseau.' : (message || '');
+    : etat === 'horsligne' ? 'Les modifications seront envoyées au retour du réseau. Ne vide pas les données du navigateur d’ici là.'
+    : etat === 'synchro' ? 'Données affichées depuis cet appareil, en attente de confirmation par Firebase.' : (message || '');
 }
 
 // ── Dialogues ─────────────────────────────────────────────────────────
@@ -736,24 +744,32 @@ function creerStoreLocal(onData) {
     supprimerCompte: op(id => { data.comptes = data.comptes.filter(x => x.id !== id); data.credits = data.credits.filter(x => x.compteId !== id); }),
     enregistrerCredit: op(c => upsert('credits', c)),
     supprimerCredit: op(id => { data.credits = data.credits.filter(x => x.id !== id); }),
-    enregistrerSnapshot: op((s, comptes = []) => { upsert('snapshots', s); comptes.forEach(c => upsert('comptes', c)); }),
+    enregistrerSnapshot: op((s, valeurs = {}) => { upsert('snapshots', s); Object.entries(valeurs).forEach(([id, v]) => { const c = data.comptes.find(x => x.id === id); if (c) c.valeur = v; }); }),
     supprimerSnapshot: op(id => { data.snapshots = data.snapshots.filter(x => x.id !== id); }),
-    enregistrerReglages: op(r => { data.reglages = r; }),
+    enregistrerReglages: op(r => { data.reglages = Object.assign({}, data.reglages, clone(r)); }),
     remplacerTout: op(d => { data = clone(d); }),
+    estSynchronise: () => true,
+    envoisEnAttente: () => false,
     arreter() {},
   };
 }
 
 async function creerStoreFirebase(db, fs, uid, onData) {
-  const { collection, doc, onSnapshot, setDoc, writeBatch } = fs;
+  const { collection, doc, onSnapshot, setDoc, writeBatch, getDocs } = fs;
   const COLS = ['comptes', 'credits', 'snapshots'];
   const data = VIDE();
   const charge = { comptes: false, credits: false, snapshots: false, reglages: false };
+  // « serveur » : au moins une réponse du serveur reçue pour cette collection pendant la session.
+  // Tant que ce n'est pas le cas, les données affichées viennent du cache de l'appareil (peut-être anciennes).
+  const serveur = { comptes: false, credits: false, snapshots: false, reglages: false };
+  const estSynchronise = () => Object.values(serveur).every(Boolean);
   const attente = {};
   const desabonnements = [];
   const ref = (col, id) => doc(db, 'users', uid, col, id);
   const sansId = o => { const { id, ...r } = o; return JSON.parse(JSON.stringify(r)); };
-  const majStatut = () => statut({ etat: !navigator.onLine ? 'horsligne' : Object.values(attente).some(Boolean) ? 'attente' : 'ok' });
+  const majStatut = () => statut({ etat: !navigator.onLine ? 'horsligne' : !estSynchronise() ? 'synchro' : Object.values(attente).some(Boolean) ? 'attente' : 'ok' });
+  const apresChargement = () => { if (estSynchronise() && !sauvegardeFaite) { sauvegardeFaite = true; sauvegardeQuotidienne().catch(e => console.warn('Sauvegarde auto', e)); } };
+  let sauvegardeFaite = false;
   const emettre = () => { if (Object.values(charge).every(Boolean)) onData(clone(data)); };
   const surErreur = e => { console.error(e); statut({ etat: 'erreur', message: messageErreur(e) }); toast('Lecture impossible : ' + messageErreur(e), 'erreur'); };
 
@@ -761,23 +777,48 @@ async function creerStoreFirebase(db, fs, uid, onData) {
     desabonnements.push(onSnapshot(collection(db, 'users', uid, col), { includeMetadataChanges: true }, snap => {
       data[col] = snap.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
       attente[col] = snap.metadata.hasPendingWrites; charge[col] = true;
-      majStatut(); emettre();
+      if (!snap.metadata.fromCache) serveur[col] = true;
+      majStatut(); emettre(); apresChargement();
     }, surErreur));
   }
   desabonnements.push(onSnapshot(ref('reglages', 'principal'), { includeMetadataChanges: true }, snap => {
     data.reglages = snap.exists() ? snap.data() : {};
     attente.reglages = snap.metadata.hasPendingWrites; charge.reglages = true;
-    majStatut(); emettre();
+    if (!snap.metadata.fromCache) serveur.reglages = true;
+    majStatut(); emettre(); apresChargement();
   }, surErreur));
   addEventListener('online', majStatut); addEventListener('offline', majStatut);
 
-  const lot = async ops => { // ops : [['set'|'delete', col, id, données?]] — découpé par 450
+  // ops : [['set'|'merge'|'delete', col, id, données?]]. Jusqu'à 450 opérations, un seul lot : tout passe ou rien.
+  // Au-delà, plusieurs lots envoyés ensemble (écritures d'abord, suppressions en dernier côté appelant).
+  const lot = ops => {
+    const lots = [];
     for (let i = 0; i < ops.length; i += 450) {
       const b = writeBatch(db);
-      ops.slice(i, i + 450).forEach(([t, col, id, d]) => t === 'set' ? b.set(ref(col, id), sansId(d)) : b.delete(ref(col, id)));
-      await b.commit();
+      ops.slice(i, i + 450).forEach(([t, col, id, d]) => t === 'delete' ? b.delete(ref(col, id)) : b.set(ref(col, id), sansId(d), t === 'merge' ? { merge: true } : {}));
+      lots.push(b.commit());
     }
+    return Promise.all(lots);
   };
+
+  // ── Sauvegardes automatiques dans Firestore (users/{uid}/sauvegardes) ──
+  // 14 emplacements « jour » tournants + 12 emplacements « mois » : au plus 26 documents, jamais de croissance.
+  const instantane = motif => {
+    const exp = { format: 'apogee-v2', version: 1, exporteLe: new Date().toISOString(), comptes: data.comptes, credits: data.credits, snapshots: data.snapshots, reglages: data.reglages || {} };
+    const donnees = JSON.stringify(exp);
+    if (donnees.length > 900000) throw new Error('Sauvegarde trop volumineuse pour Firestore.');
+    const dernier = [...data.snapshots].sort((a, b) => a.date.localeCompare(b.date)).pop();
+    return { creeLe: exp.exporteLe, motif, resume: { comptes: data.comptes.length, credits: data.credits.length, snapshots: data.snapshots.length, dernier: dernier ? dernier.date : null }, donnees };
+  };
+  const ecrireSauvegarde = (id, motif) => setDoc(ref('sauvegardes', id), instantane(motif));
+  async function sauvegardeQuotidienne() {
+    if (!data.comptes.length) return; // jamais de sauvegarde d'un état vide
+    const jour = M.dateISO();
+    if (pref('sauvegarde-' + uid, '') === jour) return;
+    const n = Math.floor(Date.parse(jour + 'T12:00:00Z') / 864e5);
+    await Promise.all([ecrireSauvegarde('jour-' + String(n % 14).padStart(2, '0'), 'quotidienne'), ecrireSauvegarde('mois-' + jour.slice(5, 7), 'mensuelle')]);
+    setPref('sauvegarde-' + uid, jour);
+  }
   return {
     mode: 'firebase',
     demarrer() {},
@@ -785,14 +826,27 @@ async function creerStoreFirebase(db, fs, uid, onData) {
     supprimerCompte: id => lot([['delete', 'comptes', id], ...data.credits.filter(c => c.compteId === id).map(c => ['delete', 'credits', c.id])]),
     enregistrerCredit: c => setDoc(ref('credits', c.id), sansId(c)),
     supprimerCredit: id => lot([['delete', 'credits', id]]),
-    enregistrerSnapshot: (s, comptes = []) => lot([['set', 'snapshots', s.id, s], ...comptes.map(c => ['set', 'comptes', c.id, c])]),
+    // Seule la valeur des comptes est modifiée (fusion) : un état ancien de l'appareil ne peut pas écraser le reste de la fiche.
+    enregistrerSnapshot: (s, valeurs = {}) => lot([['set', 'snapshots', s.id, s], ...Object.entries(valeurs).map(([id, v]) => ['merge', 'comptes', id, { valeur: v }])]),
     supprimerSnapshot: id => lot([['delete', 'snapshots', id]]),
-    enregistrerReglages: r => setDoc(ref('reglages', 'principal'), sansId(r)),
-    remplacerTout: d => lot([
-      ...COLS.flatMap(col => data[col].filter(x => !d[col].some(y => y.id === x.id)).map(x => ['delete', col, x.id])),
-      ...COLS.flatMap(col => d[col].map(x => ['set', col, x.id, x])),
-      ['set', 'reglages', 'principal', d.reglages || {}],
-    ]),
+    // Réglages : seuls les champs transmis sont écrits (fusion).
+    enregistrerReglages: r => setDoc(ref('reglages', 'principal'), sansId(r), { merge: true }),
+    async remplacerTout(d) {
+      if (!estSynchronise()) throw new Error('Données pas encore synchronisées avec Firebase : réessaie quand le statut indique « Synchronisé ».');
+      if (data.comptes.length || data.snapshots.length) await ecrireSauvegarde('avant-import', 'avant import ou restauration');
+      return lot([
+        ...COLS.flatMap(col => d[col].map(x => ['set', col, x.id, x])),
+        ['set', 'reglages', 'principal', d.reglages || {}],
+        ...COLS.flatMap(col => data[col].filter(x => !d[col].some(y => y.id === x.id)).map(x => ['delete', col, x.id])),
+      ]);
+    },
+    async listerSauvegardes() {
+      const q = await getDocs(collection(db, 'users', uid, 'sauvegardes'));
+      return q.docs.map(x => Object.assign({ id: x.id }, x.data())).sort((a, b) => (b.creeLe || '').localeCompare(a.creeLe || ''));
+    },
+    sauvegarderMaintenant: () => ecrireSauvegarde('manuelle', 'manuelle'),
+    estSynchronise,
+    envoisEnAttente: () => Object.values(attente).some(Boolean),
     arreter() { desabonnements.forEach(u => u()); },
   };
 }
@@ -910,9 +964,17 @@ function graphTableau() {
 }
 
 // ── Mise à jour mensuelle ─────────────────────────────────────────────
+const CLE_BROUILLON = 'brouillon-maj';
+function sauverBrouillon() { if (ui.maj) setPref(CLE_BROUILLON, JSON.stringify({ date: ui.maj.date, valeurs: ui.maj.valeurs, modifie: ui.maj.modifie, le: Date.now() })); }
+function effacerBrouillon() { try { localStorage.removeItem('apogee.' + CLE_BROUILLON); } catch {} }
 function initMaj() {
   const actifs = M.comptesActifs(state);
-  if (!ui.maj) ui.maj = { date: M.dateISO(), valeurs: {} };
+  if (!ui.maj) {
+    let b = null; try { b = JSON.parse(pref(CLE_BROUILLON, 'null')); } catch {}
+    // Un brouillon de moins de 30 jours avec des montants modifiés est repris (onglet fermé, téléphone en veille…)
+    if (b && b.modifie && Date.now() - b.le < 30 * 864e5) ui.maj = { date: b.date, valeurs: b.valeurs || {}, modifie: true, restaure: true };
+    else ui.maj = { date: M.dateISO(), valeurs: {} };
+  }
   actifs.forEach(c => { if (!(c.id in ui.maj.valeurs)) ui.maj.valeurs[c.id] = saisie(c.valeur); });
 }
 function snapAvant(date) { return snapsTries().filter(s => s.date < date).pop() || null; }
@@ -923,6 +985,7 @@ function pageMaj() {
   const prec = snapAvant(ui.maj.date);
   const existe = state.snapshots.find(s => s.date === ui.maj.date);
   const mois = M.moisDe(ui.maj.date);
+  const bandeauBrouillon = ui.maj.restaure ? `<div class="bandeau">Saisie en cours reprise là où tu l’avais laissée. « Annuler » pour repartir de zéro.</div>` : '';
   const groupes = ['couple', 'clement', 'alexandre'].map(p => [p, actifs.filter(c => c.proprietaire === p)]).filter(([, l]) => l.length);
   const lignes = groupes.map(([p, liste]) => `
     <div class="section-titre"><span>${esc(M.PROPRIETAIRES[p])}</span></div>
@@ -945,6 +1008,7 @@ function pageMaj() {
   return `
     <div class="titre-page"><div><h1>Mise à jour mensuelle</h1><p>Corrige les montants qui ont bougé ; les crédits se calculent tout seuls.</p></div>
       <div class="champ" style="width:170px"><label for="maj-date">Date du snapshot</label><input type="date" id="maj-date" value="${ui.maj.date}" max="${M.dateISO()}"></div></div>
+    ${bandeauBrouillon}
     ${existe ? `<div class="bandeau warn">Un snapshot existe déjà le ${dateFr(ui.maj.date)} : l’enregistrer le remplacera.</div>` : ''}
     ${lignes}
     <div class="maj-pied">
@@ -986,14 +1050,15 @@ async function enregistrerMaj() {
     if (v == null) { toast(`Montant invalide pour « ${c.nom} ».`, 'erreur'); $(`[data-maj="${CSS.escape(c.id)}"]`)?.focus(); return; }
     valeurs[c.id] = v;
   }
+  if (!await confirmerSiNonSynchronise('Enregistrer le snapshot')) return;
   if (state.snapshots.some(s => s.date === date) && !await confirmer('Remplacer le snapshot ?', `Un snapshot existe déjà le ${esc(dateFr(date))}. Il sera remplacé par ces valeurs.`, 'Remplacer')) return;
   const snap = M.construireSnapshot(state, date, valeurs);
   snap.enregistreLe = new Date().toISOString();
   // Les valeurs actuelles des comptes ne suivent que le snapshot le plus récent (pas un rattrapage passé).
   const plusRecent = !state.snapshots.some(s => s.date > date);
-  const majComptes = plusRecent ? actifs.filter(c => M.r2(c.valeur) !== M.r2(valeurs[c.id])).map(c => Object.assign({}, c, { valeur: M.r2(valeurs[c.id]) })) : [];
-  ecrire(store.enregistrerSnapshot(snap, majComptes)).then(() => {}, () => {});
-  ui.maj = null; ui.histSel = date; ui.histEdition = false;
+  const majValeurs = plusRecent ? Object.fromEntries(actifs.filter(c => M.r2(c.valeur) !== M.r2(valeurs[c.id])).map(c => [c.id, M.r2(valeurs[c.id])])) : {};
+  ecrire(store.enregistrerSnapshot(snap, majValeurs)).then(() => {}, () => {});
+  ui.maj = null; effacerBrouillon(); ui.histSel = date; ui.histEdition = false;
   toast(`Snapshot du ${dateFr(date)} enregistré.`);
   location.hash = '#/historique';
 }
@@ -1177,7 +1242,7 @@ function graphProjection() {
 function enregistrerSimulation(modif) {
   const scs = M.scenarios(state).map(sc => JSON.parse(JSON.stringify(sc)));
   modif(scs);
-  ecrire(store.enregistrerReglages(Object.assign({}, state.reglages, { simulation: { scenarios: scs } }))).catch(() => {});
+  ecrire(store.enregistrerReglages({ simulation: { scenarios: scs } })).catch(() => {});
 }
 function surChangementProjection(t) {
   if (t.dataset.sim) {
@@ -1189,12 +1254,12 @@ function surChangementProjection(t) {
   }
   if ('obj' in t.dataset) {
     const brutM = $('#pobj-montant').value.trim(), brutA = $('#pobj-annee').value.trim();
-    if (!brutM) return ecrire(store.enregistrerReglages(Object.assign({}, state.reglages, { objectif: null }))).catch(() => {});
+    if (!brutM) return ecrire(store.enregistrerReglages({ objectif: null })).catch(() => {});
     const montant = M.lireNombre(brutM), annee = parseInt(brutA, 10);
     if (montant == null || montant <= 0) return toast('Montant invalide.', 'erreur');
     if (!brutA) return; // on attend l'année
     if (!(annee >= 2000 && annee < 2200)) return toast('Année invalide.', 'erreur');
-    ecrire(store.enregistrerReglages(Object.assign({}, state.reglages, { objectif: { montant: M.r2(montant), annee } }))).catch(() => {});
+    ecrire(store.enregistrerReglages({ objectif: { montant: M.r2(montant), annee } })).catch(() => {});
   }
 }
 
@@ -1370,18 +1435,44 @@ function pageReglages() {
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-action="exporter">Exporter (JSON)</button><button class="btn" data-action="importer">Importer…</button></div>
         <p class="sous" style="margin-top:10px">L’import remplace toutes les données actuelles.</p>
       </div>
+      ${store.mode === 'local' ? '' : `<div class="carte"><h2>Sauvegardes automatiques</h2>
+        <p class="sous" style="margin-bottom:12px">Une copie complète est enregistrée chaque jour à l’ouverture (14 derniers jours + une par mois), et avant chaque import ou restauration.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-action="sauvegardes-voir">Voir les sauvegardes</button><button class="btn" data-action="sauvegarde-maintenant">Sauvegarder maintenant</button></div>
+      </div>`}
       <div class="carte"><h2>Session</h2>
         <p class="sous" style="margin-bottom:12px">${store.mode === 'local' ? 'Aucune connexion (mode local).' : 'Connecté : ' + esc(store.email || '')}</p>
         ${store.mode === 'local' ? '' : '<button class="btn" data-action="deconnexion">Se déconnecter</button>'}
       </div>
-    </div>`;
+    </div>
+    ${ui.sauvegardes === 'chargement' ? '<div class="carte" style="margin-top:16px"><p class="sous">Chargement des sauvegardes…</p></div>' : ''}
+    ${Array.isArray(ui.sauvegardes) ? `<div class="carte" style="margin-top:16px"><h2>Sauvegardes disponibles</h2>
+      ${ui.sauvegardes.length ? `<div class="tab-scroll"><table class="tab"><thead><tr><th>Date</th><th>Type</th><th class="d">Contenu</th><th></th></tr></thead><tbody>
+      ${ui.sauvegardes.map(b => `<tr><td>${esc(new Date(b.creeLe).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }))}</td><td class="text2">${esc(b.motif || '')}</td>
+        <td class="d text2">${b.resume ? `${b.resume.comptes} comptes · ${b.resume.snapshots} snapshots${b.resume.dernier ? ` · dernier ${esc(dateCourte(b.resume.dernier))}` : ''}` : ''}</td>
+        <td class="d" style="white-space:nowrap"><button class="btn btn-petit" data-action="sauvegarde-telecharger" data-id="${esc(b.id)}">Télécharger</button> <button class="btn btn-petit" data-action="sauvegarde-restaurer" data-id="${esc(b.id)}">Restaurer</button></td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="sous">Aucune sauvegarde pour l’instant : la première est créée à la prochaine ouverture de l’application.</p>'}</div>` : ''}`;
 }
 
 // ── Import / export ───────────────────────────────────────────────────
-function exporterFichier() {
+function exporterFichier(suffixe = '') {
   const blob = new Blob([JSON.stringify(M.exporter(state), null, 1)], { type: 'application/json' });
-  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `apogee-v2-${M.dateISO()}.json` });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `apogee-v2-${M.dateISO()}${suffixe}.json` });
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+// Remplacement complet (import d'un fichier ou restauration d'une sauvegarde automatique).
+async function remplacerDonnees(d, titre, libelle) {
+  if (!store.estSynchronise()) return toast('Connexion à Firebase en cours : attends que le statut indique « Synchronisé », puis recommence.', 'erreur');
+  const dernierDate = x => x.snapshots.reduce((m, s) => s.date > m ? s.date : m, '');
+  const net = d.snapshots.length ? M.historique(d, 'foyer').pop() : null;
+  const aDesDonnees = state.comptes.length || state.snapshots.length;
+  const plusAncien = aDesDonnees && (dernierDate(d) < dernierDate(state) || d.snapshots.length < state.snapshots.length);
+  let msg = `Le fichier contient <strong>${d.comptes.length} comptes</strong>, ${d.credits.length} crédits et <strong>${d.snapshots.length} snapshots</strong>${net ? ` (dernier : ${esc(dateFr(net.snapshot.date))}, net ${esc(eur(net.net))})` : ''}.`;
+  if (aDesDonnees) msg += `<br><br>Toutes les données actuelles (${state.comptes.length} comptes, ${state.snapshots.length} snapshots${dernierDate(state) ? `, dernier le ${esc(dateFr(dernierDate(state)))}` : ''}) seront remplacées.`;
+  if (plusAncien) msg += `<br><br><strong class="neg">Attention : ce fichier est plus ancien que tes données actuelles. Les snapshots plus récents seront perdus.</strong>`;
+  if (aDesDonnees) msg += `<br><br>Par sécurité, une copie des données actuelles va être téléchargée et gardée dans les sauvegardes automatiques.`;
+  if (!await confirmer(titre, msg, libelle, aDesDonnees)) return;
+  if (aDesDonnees) exporterFichier('-avant-import');
+  try { await ecrire(store.remplacerTout(d)); toast('Données remplacées.'); location.hash = '#/tableau'; } catch {}
 }
 function importerFichier() {
   const inp = Object.assign(document.createElement('input'), { type: 'file', accept: '.json,application/json' });
@@ -1390,15 +1481,17 @@ function importerFichier() {
     let d;
     try { d = M.validerDonnees(JSON.parse(await f.text())); }
     catch (e) { return toast('Import impossible : ' + e.message, 'erreur'); }
-    const net = d.snapshots.length ? M.historique(d, 'foyer').pop() : null;
-    const msg = `Le fichier contient <strong>${d.comptes.length} comptes</strong>, ${d.credits.length} crédits et <strong>${d.snapshots.length} snapshots</strong>${net ? ` (dernier : ${esc(dateFr(net.snapshot.date))}, net ${esc(eur(net.net))})` : ''}.`
-      + (state.comptes.length || state.snapshots.length ? `<br><br>Toutes les données actuelles (${state.comptes.length} comptes, ${state.snapshots.length} snapshots) seront remplacées.` : '');
-    if (!await confirmer('Importer cette sauvegarde ?', msg, 'Importer', state.comptes.length > 0)) return;
-    ecrire(store.remplacerTout(d)).then(() => toast('Import terminé.'), () => {});
-    location.hash = '#/tableau';
+    remplacerDonnees(d, 'Importer cette sauvegarde ?', 'Importer');
   };
   inp.click();
 }
+async function afficherSauvegardes() {
+  ui.sauvegardes = 'chargement'; rendre();
+  try { ui.sauvegardes = await store.listerSauvegardes(); }
+  catch (e) { ui.sauvegardes = null; toast('Lecture des sauvegardes impossible : ' + messageErreur(e), 'erreur'); }
+  rendre();
+}
+function sauvegardeParId(id) { return Array.isArray(ui.sauvegardes) ? ui.sauvegardes.find(x => x.id === id) : null; }
 
 // ══════════════════════════════════════════════════════════════════════
 // RENDU & ÉVÉNEMENTS
@@ -1438,24 +1531,43 @@ function route() {
   rendre();
 }
 addEventListener('hashchange', route);
+addEventListener('beforeunload', e => {
+  if (store && store.envoisEnAttente()) { e.preventDefault(); e.returnValue = ''; }
+});
 
 const actions = {
   'importer': importerFichier,
   'exporter': exporterFichier,
-  'deconnexion': () => store.deconnecter && store.deconnecter(),
+  'deconnexion': async () => {
+    if (store.envoisEnAttente() && !await confirmer('Modifications pas encore envoyées', 'Certaines modifications n’ont pas encore été confirmées par Firebase. Si tu te déconnectes maintenant, elles risquent d’être perdues.', 'Se déconnecter quand même', true)) return;
+    store.deconnecter && store.deconnecter();
+  },
+  'sauvegardes-voir': afficherSauvegardes,
+  'sauvegarde-maintenant': async () => { try { await ecrire(store.sauvegarderMaintenant()); toast('Sauvegarde enregistrée.'); afficherSauvegardes(); } catch {} },
+  'sauvegarde-telecharger': el => {
+    const b = sauvegardeParId(el.dataset.id); if (!b) return;
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([b.donnees], { type: 'application/json' })), download: `apogee-v2-sauvegarde-${(b.creeLe || '').slice(0, 10)}.json` });
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  },
+  'sauvegarde-restaurer': el => {
+    const b = sauvegardeParId(el.dataset.id); if (!b) return;
+    let d; try { d = M.validerDonnees(JSON.parse(b.donnees)); } catch (e) { return toast('Sauvegarde illisible : ' + e.message, 'erreur'); }
+    remplacerDonnees(d, `Restaurer la sauvegarde du ${dateFr((b.creeLe || '').slice(0, 10))} ?`, 'Restaurer');
+  },
   'horizon': el => { ui.horizon = +el.dataset.h; setPref('horizon', ui.horizon); rendre(); },
-  'maj-annuler': async () => { if (await confirmer('Abandonner la mise à jour ?', 'Les montants saisis seront perdus.', 'Abandonner', true)) { ui.maj = null; location.hash = '#/tableau'; } },
+  'maj-annuler': async () => { if (await confirmer('Abandonner la mise à jour ?', 'Les montants saisis seront perdus.', 'Abandonner', true)) { ui.maj = null; effacerBrouillon(); location.hash = '#/tableau'; } },
   'maj-enregistrer': enregistrerMaj,
   'hist-select': el => { ui.histSel = el.dataset.date; ui.histEdition = false; rendre(); },
   'hist-modifier': () => { ui.histEdition = true; rendre(); },
   'hist-annuler': () => { ui.histEdition = false; rendre(); },
-  'hist-sauver': () => {
+  'hist-sauver': async () => {
+    if (!await confirmerSiNonSynchronise('Modifier ce snapshot')) return;
     const snap = state.snapshots.find(s => s.date === ui.histSel); if (!snap) return;
     const valeurs = {};
     for (const inp of $$('[data-edit]')) { const v = M.lireNombre(inp.value); if (v == null) return toast('Montant invalide.', 'erreur'); valeurs[inp.dataset.edit] = M.r2(v); }
     const plusRecent = !state.snapshots.some(s => s.date > snap.date);
-    const majComptes = plusRecent ? state.comptes.filter(c => c.actif !== false && c.id in valeurs && M.r2(c.valeur) !== valeurs[c.id]).map(c => Object.assign({}, c, { valeur: valeurs[c.id] })) : [];
-    ecrire(store.enregistrerSnapshot(Object.assign({}, snap, { valeurs, modifieLe: new Date().toISOString() }), majComptes)).catch(() => {});
+    const majValeurs = plusRecent ? Object.fromEntries(state.comptes.filter(c => c.actif !== false && c.id in valeurs && M.r2(c.valeur) !== valeurs[c.id]).map(c => [c.id, valeurs[c.id]])) : {};
+    ecrire(store.enregistrerSnapshot(Object.assign({}, snap, { valeurs, modifieLe: new Date().toISOString() }), majValeurs)).catch(() => {});
     ui.histEdition = false; toast('Snapshot modifié.'); rendre();
   },
   'hist-supprimer': async () => {
@@ -1507,13 +1619,13 @@ const actions = {
   },
   'sim-defaut': async () => {
     if (!(await confirmer('Rétablir les valeurs par défaut ?', 'Les rendements et l’épargne des trois scénarios reprennent leurs valeurs d’origine.', 'Rétablir'))) return;
-    ecrire(store.enregistrerReglages(Object.assign({}, state.reglages, { simulation: null }))).catch(() => {});
+    ecrire(store.enregistrerReglages({ simulation: null })).catch(() => {});
   },
   'objectif-sauver': () => {
     const montant = M.lireNombre($('#obj-montant').value), annee = parseInt($('#obj-annee').value, 10);
     const vide = !$('#obj-montant').value.trim();
     if (!vide && (montant == null || montant <= 0 || !(annee >= 2000 && annee < 2200))) return toast('Objectif invalide.', 'erreur');
-    ecrire(store.enregistrerReglages(Object.assign({}, state.reglages, { objectif: vide ? null : { montant, annee } }))).catch(() => {});
+    ecrire(store.enregistrerReglages({ objectif: vide ? null : { montant, annee } })).catch(() => {});
     toast(vide ? 'Objectif retiré.' : 'Objectif enregistré.');
   },
 };
@@ -1525,10 +1637,10 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   const id = e.target.dataset && e.target.dataset.maj;
-  if (id && ui.maj) { ui.maj.valeurs[id] = e.target.value; rafraichirMaj(); }
+  if (id && ui.maj) { ui.maj.valeurs[id] = e.target.value; ui.maj.modifie = true; sauverBrouillon(); rafraichirMaj(); }
 });
 document.addEventListener('change', e => {
-  if (e.target.id === 'maj-date' && ui.maj) { ui.maj.date = e.target.value || M.dateISO(); rendre(); }
+  if (e.target.id === 'maj-date' && ui.maj) { ui.maj.date = e.target.value || M.dateISO(); if (ui.maj.modifie) sauverBrouillon(); rendre(); }
   if (ui.page === 'projection' && e.target.dataset && (e.target.dataset.sim || 'obj' in e.target.dataset)) surChangementProjection(e.target);
 });
 
