@@ -47,6 +47,10 @@ a{color:inherit}
 .connexion-carte h1{font-size:26px;letter-spacing:-.5px;margin:14px 0 4px}
 .connexion-carte p{color:var(--text2);margin-bottom:24px}
 .erreur{color:var(--neg);font-size:13px;margin-top:14px}
+.form-connexion{display:flex;flex-direction:column;gap:12px;text-align:left}
+.lien-discret{background:none;border:0;color:var(--text2);font-size:13px;margin-top:14px;cursor:pointer;text-decoration:underline}
+.connexion-carte p.erreur{color:var(--neg);margin:12px 0 0}
+.connexion-carte p.info-cx{color:var(--pos);font-size:13px;margin:10px 0 0}
 
 /* ── En-tête ── */
 .entete{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
@@ -238,8 +242,14 @@ details.archives summary{cursor:pointer;color:var(--text2);font-size:13px;margin
     <svg width="54" height="54" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1a3c2e"/><path d="M5 24 12.5 11l4.5 7.5 3-4.5L27 24Z" fill="#e9dcae"/></svg>
     <h1>Apogée</h1>
     <p>Suivi de patrimoine</p>
-    <button id="btn-google" class="btn btn-primaire" style="width:100%;padding:11px">Se connecter avec Google</button>
+    <form id="form-connexion" class="form-connexion">
+      <div class="champ"><label for="cx-email">Adresse e-mail</label><input type="email" id="cx-email" autocomplete="username" required></div>
+      <div class="champ"><label for="cx-mdp">Mot de passe</label><input type="password" id="cx-mdp" autocomplete="current-password" required></div>
+      <button type="submit" id="cx-valider" class="btn btn-primaire" style="width:100%;padding:11px">Se connecter</button>
+    </form>
+    <button type="button" id="cx-oubli" class="lien-discret">Mot de passe oublié ?</button>
     <p id="connexion-erreur" class="erreur" hidden></p>
+    <p id="connexion-info" class="info-cx" hidden></p>
   </div>
 </div>
 
@@ -554,15 +564,15 @@ root.Model = { TYPES, CATEGORIES, PROPRIETAIRES, FILTRES, r2, part, dateISO, moi
 // Tant que apiKey est vide, l'application tourne en MODE LOCAL (données
 // stockées dans ce navigateur uniquement).
 const FIREBASE_CONFIG = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyBebjWCvPEqvU6L1ukcJdQwELMd0qSvH8A',
+  authDomain: 'apogee-5b4bc.firebaseapp.com',
+  projectId: 'apogee-5b4bc',
+  storageBucket: 'apogee-5b4bc.firebasestorage.app',
+  messagingSenderId: '143780580164',
+  appId: '1:143780580164:web:6d7c555fdfd56fa82a6511',
 };
-// Adresse Google autorisée (la vraie protection reste les règles Firestore).
-const EMAIL_AUTORISE = '';
+// Adresse autorisée (la vraie protection reste les règles Firestore).
+const EMAIL_AUTORISE = 'clementmaufroy@outlook.fr';
 const FIREBASE_VERSION = '10.12.2';
 const VERSION_APP = '2.0.0';
 
@@ -1391,7 +1401,18 @@ function afficherApp() { $('#ecran-connexion').hidden = true; $('#app').hidden =
 function afficherConnexion(erreur) {
   $('#app').hidden = true; $('#ecran-connexion').hidden = false;
   const p = $('#connexion-erreur'); p.hidden = !erreur; p.textContent = erreur || '';
+  $('#connexion-info').hidden = true;
 }
+const MESSAGES_AUTH = {
+  'auth/invalid-credential': 'Adresse ou mot de passe incorrect.',
+  'auth/wrong-password': 'Adresse ou mot de passe incorrect.',
+  'auth/user-not-found': 'Adresse ou mot de passe incorrect.',
+  'auth/invalid-email': 'Adresse e-mail invalide.',
+  'auth/too-many-requests': 'Trop de tentatives : réessaie dans quelques minutes.',
+  'auth/network-request-failed': 'Pas de connexion internet.',
+  'auth/user-disabled': 'Ce compte est désactivé.',
+};
+const messageAuth = e => MESSAGES_AUTH[e.code] || ('Connexion impossible : ' + (e.code || e.message));
 
 async function demarrer() {
   const forcerLocal = new URLSearchParams(location.search).get('mode') === 'local';
@@ -1414,14 +1435,21 @@ async function demarrer() {
   let db;
   try { db = fb.fs.initializeFirestore(app, { localCache: fb.fs.persistentLocalCache({ tabManager: fb.fs.persistentMultipleTabManager() }) }); }
   catch { db = fb.fs.getFirestore(app); }
-  const fournisseur = new fb.auth.GoogleAuthProvider();
-  fournisseur.setCustomParameters({ prompt: 'select_account' });
-  $('#btn-google').onclick = async () => {
-    try { await fb.auth.signInWithPopup(auth, fournisseur); }
-    catch (e) {
-      if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(e.code)) return fb.auth.signInWithRedirect(auth, fournisseur);
-      if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') afficherConnexion('Connexion impossible : ' + (e.message || e.code));
-    }
+  $('#form-connexion').onsubmit = async ev => {
+    ev.preventDefault();
+    const btn = $('#cx-valider'); btn.disabled = true; btn.textContent = 'Connexion…';
+    try { await fb.auth.signInWithEmailAndPassword(auth, $('#cx-email').value.trim(), $('#cx-mdp').value); }
+    catch (e) { afficherConnexion(messageAuth(e)); }
+    finally { btn.disabled = false; btn.textContent = 'Se connecter'; }
+  };
+  $('#cx-oubli').onclick = async () => {
+    const email = $('#cx-email').value.trim();
+    if (!email) return afficherConnexion('Saisis d’abord ton adresse e-mail.');
+    try {
+      await fb.auth.sendPasswordResetEmail(auth, email);
+      afficherConnexion();
+      const i = $('#connexion-info'); i.hidden = false; i.textContent = 'Si cette adresse correspond à ton compte, un e-mail de réinitialisation vient de partir (pense aux indésirables).';
+    } catch (e) { afficherConnexion(messageAuth(e)); }
   };
   fb.auth.onAuthStateChanged(auth, async user => {
     if (store) { store.arreter(); store = null; state = null; }
