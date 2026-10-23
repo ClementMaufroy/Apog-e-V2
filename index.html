@@ -4,8 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Apogée</title>
-<meta name="theme-color" content="#1a3c2e">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a3c2e'/%3E%3Cpath d='M5 24 12.5 11l4.5 7.5 3-4.5L27 24Z' fill='%23e9dcae'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#01332f">
+<meta name="description" content="Suivi de patrimoine personnel">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icone-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/icone-16.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icone-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Apogée">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
@@ -44,6 +50,14 @@ a{color:inherit}
 .pos{color:var(--pos)} .neg{color:var(--neg)} .muted{color:var(--text3)} .text2{color:var(--text2)}
 
 /* ── Connexion ── */
+.logo-entete{height:32px;width:auto;display:block}
+.logo-connexion{width:210px;max-width:80%;height:auto;display:block;margin:0 auto 6px}
+.chargement-ecran{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+.chargement-ecran[hidden]{display:none}
+.chargement-icone{border-radius:18px;box-shadow:var(--shadow)}
+.roue{width:30px;height:30px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--accent);animation:tourne .8s linear infinite}
+@keyframes tourne{to{transform:rotate(360deg)}}
+#chargement-texte{color:var(--text2);font-size:14px}
 .connexion{min-height:100vh;display:grid;place-items:center;padding:24px}
 .connexion-carte{background:var(--surface);border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow);padding:40px 36px;max-width:380px;width:100%;text-align:center}
 .connexion-carte h1{font-size:26px;letter-spacing:-.5px;margin:14px 0 4px}
@@ -230,6 +244,7 @@ details.archives summary{cursor:pointer;color:var(--text2);font-size:13px;margin
   .entete{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--bg)}
   .entete-in{flex-wrap:wrap;padding:8px 14px;gap:8px 10px}
   .marque{flex:1}
+  .logo-entete{height:28px}
   .entete-droite{order:2}
   .filtre{order:3;width:100%;justify-content:stretch}
   .filtre button{flex:1}
@@ -259,10 +274,17 @@ details.archives summary{cursor:pointer;color:var(--text2);font-size:13px;margin
 </head>
 <body>
 
+<div id="ecran-chargement" class="chargement-ecran" role="status" aria-live="polite">
+  <img src="icons/icone-192.png" alt="" width="76" height="76" class="chargement-icone">
+  <div class="roue" aria-hidden="true"></div>
+  <p id="chargement-texte">Chargement…</p>
+  <p id="chargement-detail" class="sous" hidden></p>
+  <button type="button" id="chargement-continuer" class="btn" hidden>Continuer avec les données de cet appareil</button>
+</div>
+
 <div id="ecran-connexion" class="connexion" hidden>
   <div class="connexion-carte">
-    <svg width="54" height="54" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1a3c2e"/><path d="M5 24 12.5 11l4.5 7.5 3-4.5L27 24Z" fill="#e9dcae"/></svg>
-    <h1>Apogée</h1>
+    <picture><source srcset="icons/logo-clair.png" media="(prefers-color-scheme: dark)"><img src="icons/logo.png" alt="Apogée" class="logo-connexion"></picture>
     <p>Suivi de patrimoine</p>
     <form id="form-connexion" class="form-connexion">
       <div class="champ"><label for="cx-email">Adresse e-mail</label><input type="email" id="cx-email" autocomplete="username" required></div>
@@ -279,8 +301,7 @@ details.archives summary{cursor:pointer;color:var(--text2);font-size:13px;margin
   <header class="entete">
     <div class="entete-in">
       <a class="marque" href="#/tableau">
-        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1a3c2e"/><path d="M5 24 12.5 11l4.5 7.5 3-4.5L27 24Z" fill="#e9dcae"/></svg>
-        Apogée
+        <picture><source srcset="icons/logo-clair.png" media="(prefers-color-scheme: dark)"><img src="icons/logo.png" alt="Apogée" class="logo-entete"></picture>
       </a>
       <nav class="nav" id="nav" aria-label="Navigation">
         <a href="#/tableau" data-page="tableau"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.2"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.2"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.2"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.2"/></svg><span>Tableau de bord</span></a>
@@ -1581,6 +1602,11 @@ function pageReglages() {
         <p class="sous" style="margin-bottom:12px">Une copie complète est enregistrée chaque jour à l’ouverture (14 derniers jours + une par mois), et avant chaque import ou restauration.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-action="sauvegardes-voir">Voir les sauvegardes</button><button class="btn" data-action="sauvegarde-maintenant">Sauvegarder maintenant</button></div>
       </div>`}
+      <div class="carte"><h2>Application</h2>
+        ${estInstallee() ? '<p class="sous">Apogée est ouverte comme application installée.</p>'
+          : invitationInstallation ? `<p class="sous" style="margin-bottom:12px">Installe Apogée sur cet appareil : elle s’ouvrira dans sa propre fenêtre, avec son icône.</p><button class="btn btn-primaire" data-action="installer">Installer Apogée</button>`
+          : '<p class="sous">Pour l’installer : dans Chrome, clique sur l’icône d’installation à droite de la barre d’adresse (ou menu ⋮ › Caster, enregistrer et partager › Installer). Déjà installée ? Ouvre-la depuis le menu Démarrer ou le bureau.</p>'}
+      </div>
       <div class="carte"><h2>Session</h2>
         <p class="sous" style="margin-bottom:12px">${store.mode === 'local' ? 'Aucune connexion (mode local).' : 'Connecté : ' + esc(store.email || '')}</p>
         ${store.mode === 'local' ? '' : '<button class="btn" data-action="deconnexion">Se déconnecter</button>'}
@@ -1697,6 +1723,12 @@ addEventListener('beforeunload', e => {
 const actions = {
   'importer': importerFichier,
   'exporter': exporterFichier,
+  'installer': async () => {
+    if (!invitationInstallation) return;
+    invitationInstallation.prompt();
+    try { await invitationInstallation.userChoice; } catch {}
+    invitationInstallation = null; rendre();
+  },
   'deconnexion': async () => {
     if (store.envoisEnAttente() && !await confirmer('Modifications pas encore envoyées', 'Certaines modifications n’ont pas encore été confirmées par Firebase. Si tu te déconnectes maintenant, elles risquent d’être perdues.', 'Se déconnecter quand même', true)) return;
     store.deconnecter && store.deconnecter();
@@ -1807,6 +1839,7 @@ document.addEventListener('change', e => {
 // Nouvelles données (chargement, autre appareil, écriture locale)
 function surDonnees(d) {
   state = d;
+  if ($('#app').hidden) { verifierPret(); return; }
   const dlgCompte = $('#dialogue');
   if (dlgCompte.open && dlgCompte.dataset.compte && $('#fc-credits')) {
     // Rafraîchit la liste des crédits du compte ouvert sans fermer le formulaire
@@ -1829,9 +1862,10 @@ function rendreApresFocus() {
 // ══════════════════════════════════════════════════════════════════════
 // DÉMARRAGE
 // ══════════════════════════════════════════════════════════════════════
-function afficherApp() { $('#ecran-connexion').hidden = true; $('#app').hidden = false; route(); }
+function afficherApp() { clearTimeout(minuteurChargement); $('#ecran-chargement').hidden = true; $('#ecran-connexion').hidden = true; $('#app').hidden = false; route(); }
 function afficherConnexion(erreur) {
-  $('#app').hidden = true; $('#ecran-connexion').hidden = false;
+  clearTimeout(minuteurChargement);
+  $('#ecran-chargement').hidden = true; $('#app').hidden = true; $('#ecran-connexion').hidden = false;
   const p = $('#connexion-erreur'); p.hidden = !erreur; p.textContent = erreur || '';
   $('#connexion-info').hidden = true;
 }
@@ -1846,14 +1880,35 @@ const MESSAGES_AUTH = {
 };
 const messageAuth = e => MESSAGES_AUTH[e.code] || ('Connexion impossible : ' + (e.code || e.message));
 
+// ── Écran de chargement ──
+// Tant que Firebase n'a pas confirmé les données, l'application reste masquée derrière une roue.
+// Si la connexion est lente ou absente, on propose d'ouvrir les données gardées sur l'appareil.
+let minuteurChargement = null, horsLigneAccepte = false;
+function afficherChargement(texte) {
+  $('#app').hidden = true; $('#ecran-connexion').hidden = true; $('#ecran-chargement').hidden = false;
+  $('#chargement-texte').textContent = texte;
+  $('#chargement-detail').hidden = true; $('#chargement-continuer').hidden = true;
+  clearTimeout(minuteurChargement);
+  const proposer = msg => { $('#chargement-detail').textContent = msg; $('#chargement-detail').hidden = false; $('#chargement-continuer').hidden = false; };
+  if (!navigator.onLine) proposer('Pas de connexion internet. Tu peux ouvrir les données gardées sur cet appareil ; tes modifications partiront au retour du réseau.');
+  else minuteurChargement = setTimeout(() => proposer('La connexion à Firebase est lente. Tu peux patienter ou ouvrir les données gardées sur cet appareil (peut-être pas à jour).'), 8000);
+}
+// L'application s'affiche quand les données sont confirmées par Firebase (ou si l'utilisateur a choisi de continuer).
+function verifierPret() {
+  if (!store || !state || !$('#app').hidden) return false;
+  if (store.mode === 'local' || store.estSynchronise() || horsLigneAccepte) { afficherApp(); return true; }
+  return false;
+}
 async function demarrer() {
+  $('#chargement-continuer').onclick = () => { horsLigneAccepte = true; if (!verifierPret()) $('#chargement-texte').textContent = 'Lecture des données de l’appareil…'; };
   const forcerLocal = new URLSearchParams(location.search).get('mode') === 'local';
   if (!FIREBASE_CONFIG.apiKey || forcerLocal) {
     store = creerStoreLocal(surDonnees);
-    afficherApp();
     store.demarrer();
+    afficherApp();
     return;
   }
+  afficherChargement('Chargement…');
   let fb;
   try {
     const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/`;
@@ -1885,20 +1940,31 @@ async function demarrer() {
   };
   fb.auth.onAuthStateChanged(auth, async user => {
     if (store) { store.arreter(); store = null; state = null; }
+    $('#app').hidden = true;
     if (!user) return afficherConnexion();
     if (EMAIL_AUTORISE && (user.email || '').toLowerCase() !== EMAIL_AUTORISE.toLowerCase()) {
       await fb.auth.signOut(auth);
       return afficherConnexion(`Le compte ${user.email} n’est pas autorisé.`);
     }
-    $('#page').innerHTML = '<div class="chargement">Chargement…</div>';
-    afficherApp();
+    horsLigneAccepte = false;
+    afficherChargement('Connexion à tes données…');
     store = await creerStoreFirebase(db, fb.fs, user.uid, surDonnees);
     store.email = user.email;
     store.deconnecter = () => fb.auth.signOut(auth);
-    statut({ etat: 'attente' });
+    statut({ etat: 'synchro' });
+    verifierPret();
   });
 }
 demarrer();
+
+// ── Application installable (Chrome, Edge…) ──
+let invitationInstallation = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); invitationInstallation = e; if (ui.page === 'reglages' && state) rendre(); });
+addEventListener('appinstalled', () => { invitationInstallation = null; toast('Apogée est installée.'); if (ui.page === 'reglages' && state) rendre(); });
+const estInstallee = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('Service worker', e)));
+}
 </script>
 </body>
 </html>
