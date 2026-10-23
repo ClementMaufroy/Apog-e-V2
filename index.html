@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Apogée</title>
+<meta name="theme-color" content="#1a3c2e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a3c2e'/%3E%3Cpath d='M5 24 12.5 11l4.5 7.5 3-4.5L27 24Z' fill='%23e9dcae'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --bg:#f4f3ef; --surface:#fff; --surface2:#f8f7f3; --border:#e6e3da; --border2:#d3cfc3;
+  --text:#1a1916; --text2:#5f5c55; --text3:#94908a;
+  --accent:#1a3c2e; --accent-hover:#24523f; --on-accent:#fff; --accent-soft:#e4eee8;
+  --pos:#1d7a4c; --neg:#b3402f; --warn:#8a5c00; --warn-bg:#fcf1d8; --info-bg:#eef3f7;
+  --radius:14px; --radius-sm:9px;
+  --shadow:0 1px 2px rgba(30,25,10,.05),0 6px 20px rgba(30,25,10,.04);
+  --sans:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'DM Mono',ui-monospace,'SF Mono',monospace;
+  --cat-immobilier:#3b6ea5; --cat-liquidites:#4c9a78; --cat-placements:#8a63c2; --cat-salariale:#c7843b;
+  --cat-crypto:#c9a227; --cat-obligations:#c4605a; --cat-autre:#8a877f;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#121311; --surface:#1b1c19; --surface2:#22231f; --border:#2d2f2a; --border2:#3b3d37;
+    --text:#ecebe5; --text2:#b4b1a8; --text3:#7f7c75;
+    --accent:#86c8a2; --accent-hover:#a2d8b8; --on-accent:#0f2419; --accent-soft:#1d3127;
+    --pos:#6fcf97; --neg:#f08b7b; --warn:#e8c56c; --warn-bg:#352c19; --info-bg:#1c2630;
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;line-height:1.45;min-height:100vh}
+button,input,select{font:inherit;color:inherit}
+a{color:inherit}
+[hidden]{display:none!important}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .muted{color:var(--text3)} .text2{color:var(--text2)}
+
+/* ── Connexion ── */
+.connexion{min-height:100vh;display:grid;place-items:center;padding:24px}
+.connexion-carte{background:var(--surface);border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow);padding:40px 36px;max-width:380px;width:100%;text-align:center}
+.connexion-carte h1{font-size:26px;letter-spacing:-.5px;margin:14px 0 4px}
+.connexion-carte p{color:var(--text2);margin-bottom:24px}
+.erreur{color:var(--neg);font-size:13px;margin-top:14px}
+
+/* ── En-tête ── */
+.entete{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.entete-in{max-width:1120px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:18px}
+.marque{display:flex;align-items:center;gap:9px;font-weight:600;font-size:16px;letter-spacing:-.3px;text-decoration:none;flex-shrink:0}
+.nav{display:flex;gap:2px;flex:1}
+.nav a{display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:var(--radius-sm);text-decoration:none;color:var(--text2);font-size:13.5px;white-space:nowrap}
+.nav a svg{width:16px;height:16px;flex-shrink:0}
+.nav a:hover{background:var(--surface2);color:var(--text)}
+.nav a.actif{background:var(--accent);color:var(--on-accent)}
+.entete-droite{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.filtre{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:2px}
+.filtre button{border:0;background:none;padding:5px 12px;border-radius:999px;font-size:12.5px;color:var(--text2);cursor:pointer}
+.filtre button.actif{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:500}
+.statut{font-size:11.5px;color:var(--text3);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.statut::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+.statut.ok{color:var(--pos)} .statut.attente{color:var(--warn)} .statut.erreur{color:var(--neg)} .statut.local{color:var(--warn)}
+.btn-icone{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;color:var(--text2);text-decoration:none;border:0;background:none;cursor:pointer}
+.btn-icone:hover{background:var(--surface2);color:var(--text)}
+.btn-icone.actif{background:var(--accent);color:var(--on-accent)}
+.btn-icone svg{width:17px;height:17px}
+
+/* ── Page ── */
+.page{max-width:1120px;margin:0 auto;padding:26px 20px 60px}
+.titre-page{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.titre-page h1{font-size:22px;letter-spacing:-.4px;font-weight:600}
+.titre-page p{color:var(--text3);font-size:13px;margin-top:2px}
+.carte{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px}
+.carte + .carte{margin-top:16px}
+.carte h2{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.grille{display:grid;gap:16px}
+.g-2{grid-template-columns:1.35fr 1fr}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.pile > * + *{margin-top:16px}
+.bandeau{border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;background:var(--info-bg);color:var(--text2);margin-bottom:16px;display:flex;gap:10px;align-items:flex-start}
+.bandeau.warn{background:var(--warn-bg);color:var(--warn)}
+
+/* ── Boutons ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--border2);background:var(--surface);border-radius:var(--radius-sm);padding:8px 14px;font-size:13.5px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn-primaire{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:500}
+.btn-primaire:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn-danger{color:var(--neg);border-color:color-mix(in srgb,var(--neg) 40%,var(--border))}
+.btn-danger:hover{background:color-mix(in srgb,var(--neg) 8%,var(--surface))}
+.btn-lien{border:0;background:none;padding:4px 6px;color:var(--text2);text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-size:13px}
+.btn-petit{padding:5px 10px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.segment{display:inline-flex;border:1px solid var(--border2);border-radius:var(--radius-sm);overflow:hidden}
+.segment button{border:0;background:var(--surface);padding:6px 12px;font-size:13px;cursor:pointer;border-right:1px solid var(--border)}
+.segment button:last-child{border-right:0}
+.segment button.actif{background:var(--accent);color:var(--on-accent)}
+
+/* ── Tableau de bord ── */
+.hero-label{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3)}
+.hero-valeur{font-size:44px;font-weight:500;letter-spacing:-1.5px;margin:4px 0 6px;line-height:1.1}
+.hero-sous{color:var(--text2);font-size:13px}
+.pastilles{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.pastille{border:1px solid var(--border);background:var(--surface2);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--text2)}
+.pastille strong{font-weight:600}
+.graph{position:relative;height:220px}
+.graph-grand{position:relative;height:340px}
+.hero{display:flex;flex-direction:column}
+.graph-hero{flex:1;min-height:220px;margin-top:18px}
+.repartition{display:flex;flex-direction:column;gap:11px}
+.rep-ligne{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:13px}
+.rep-barre{grid-column:1/-1;height:7px;border-radius:4px;background:var(--surface2);overflow:hidden}
+.rep-barre span{display:block;height:100%;border-radius:4px}
+.objectif-barre{height:9px;background:var(--surface2);border-radius:5px;overflow:hidden;margin:10px 0 6px}
+.objectif-barre span{display:block;height:100%;background:var(--accent);border-radius:5px}
+.maj-cta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+/* ── Listes de comptes ── */
+.section-titre{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:22px 0 8px;display:flex;justify-content:space-between;gap:10px}
+.section-titre:first-child{margin-top:0}
+table.tab{width:100%;border-collapse:collapse;font-size:13.5px}
+table.tab-comptes{table-layout:fixed;min-width:640px}
+@media (max-width:640px){table.tab-comptes{table-layout:auto;min-width:0}}
+.tab th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:500;text-align:left;padding:0 10px 8px;border-bottom:1px solid var(--border)}
+.tab td{padding:10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tab tr:last-child td{border-bottom:0}
+.tab .d{text-align:right}
+.tab tfoot td{font-weight:600;border-top:1px solid var(--border2);border-bottom:0}
+.tab tr.cliquable{cursor:pointer}
+.tab tr.cliquable:hover td{background:var(--surface2)}
+.tab tr.selection td{background:var(--accent-soft)}
+.tab tr.estompe td{opacity:.45}
+.nom-compte{font-weight:500}
+.sous{font-size:12px;color:var(--text3)}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);white-space:nowrap}
+.badge.couple{background:color-mix(in srgb,var(--cat-placements) 12%,var(--surface));border-color:color-mix(in srgb,var(--cat-placements) 25%,var(--border))}
+.badge.clement{background:color-mix(in srgb,var(--cat-immobilier) 12%,var(--surface));border-color:color-mix(in srgb,var(--cat-immobilier) 25%,var(--border))}
+.badge.alexandre{background:color-mix(in srgb,var(--cat-liquidites) 12%,var(--surface));border-color:color-mix(in srgb,var(--cat-liquidites) 25%,var(--border))}
+.tab-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* ── Mise à jour ── */
+.maj-ligne{display:grid;grid-template-columns:minmax(0,1fr) 130px 150px 110px;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border)}
+.maj-ligne:last-child{border-bottom:0}
+.maj-entete{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding-top:0}
+.champ-montant{display:flex;align-items:center;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);padding:0 10px}
+.champ-montant:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.champ-montant input{border:0;background:none;outline:0;width:100%;padding:8px 0;text-align:right;font-family:var(--mono);font-size:14px}
+.champ-montant span{color:var(--text3);margin-left:6px}
+.champ-montant.invalide{border-color:var(--neg)}
+.maj-pied{position:sticky;bottom:0;z-index:5;margin-top:16px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);box-shadow:0 -4px 20px rgba(0,0,0,.06);padding:14px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.maj-pied .total{flex:1;min-width:200px}
+.maj-pied .total strong{font-size:22px;font-weight:500;letter-spacing:-.5px}
+.maj-boutons{display:flex;gap:8px}
+
+/* ── Formulaires & dialogues ── */
+dialog{border:0;border-radius:18px;padding:0;background:var(--surface);color:var(--text);box-shadow:0 20px 60px rgba(0,0,0,.25);width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog::backdrop{background:rgba(15,15,10,.45)}
+.dlg-tete{padding:18px 22px 4px;font-size:17px;font-weight:600}
+.dlg-corps{padding:12px 22px;max-height:calc(100vh - 170px);overflow:auto}
+.dlg-pied{padding:14px 22px 18px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--border)}
+.dlg-pied .gauche{margin-right:auto;display:flex;gap:8px}
+.champs{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.champ{display:flex;flex-direction:column;gap:5px}
+.champ.large{grid-column:1/-1}
+.champ label{font-size:12px;color:var(--text2);font-weight:500}
+.champ input,.champ select{border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px 10px;background:var(--surface);outline:0;width:100%}
+.champ input:focus,.champ select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.champ .aide{font-size:11.5px;color:var(--text3)}
+.sep{height:1px;background:var(--border);margin:16px 0}
+.sous-titre{font-size:13px;font-weight:600;margin-bottom:8px}
+.credit-ligne{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;background:var(--surface2)}
+.credit-ligne .infos{flex:1;min-width:0}
+.boite{border:1px dashed var(--border2);border-radius:var(--radius-sm);padding:12px;margin-top:8px}
+.radios{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0 10px;font-size:13px}
+.radios label{display:flex;align-items:center;gap:6px;cursor:pointer}
+
+/* ── Divers ── */
+.vide{text-align:center;padding:50px 20px;color:var(--text2)}
+.vide h2{font-size:18px;color:var(--text);margin-bottom:8px}
+.vide p{margin-bottom:18px}
+.jalons{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.jalon{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px}
+.jalon .l{font-size:11.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
+.jalon .v{font-size:18px;font-weight:500;margin-top:3px}
+.jalon .s{font-size:12px;color:var(--text3);margin-top:2px}
+.toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:100;max-width:min(380px,calc(100vw - 36px))}
+.toast{background:var(--text);color:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);display:flex;gap:10px;align-items:flex-start;animation:entree .2s ease}
+.toast.erreur{background:var(--neg);color:#fff}
+.toast button{border:0;background:none;color:inherit;opacity:.7;cursor:pointer;font-size:16px;line-height:1}
+@keyframes entree{from{opacity:0;transform:translateY(6px)}}
+.chargement{padding:80px 20px;text-align:center;color:var(--text3)}
+details.archives summary{cursor:pointer;color:var(--text2);font-size:13px;margin-top:18px}
+
+/* ── Mobile ── */
+@media (max-width:860px){
+  .g-2,.g-3{grid-template-columns:1fr}
+  .nav a span{display:none}
+  .nav a{padding:8px 10px}
+}
+@media (max-width:640px){
+  .entete{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--bg)}
+  .entete-in{flex-wrap:wrap;padding:8px 14px;gap:8px 10px}
+  .marque{flex:1}
+  .entete-droite{order:2}
+  .filtre{order:3;width:100%;justify-content:stretch}
+  .filtre button{flex:1}
+  .nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--border);padding:6px 6px calc(6px + env(safe-area-inset-bottom));justify-content:space-around}
+  .nav a{flex-direction:column;gap:2px;font-size:10.5px;padding:5px 4px;flex:1;justify-content:center}
+  .nav a span{display:block}
+  .nav a.actif{background:var(--accent-soft);color:var(--accent)}
+  .page{padding:18px 14px 110px}
+  .hero-valeur{font-size:34px}
+  .carte{padding:15px 15px}
+  .maj-ligne{grid-template-columns:minmax(0,1fr) 140px;gap:6px 10px}
+  .maj-ligne{grid-template-areas:'nom champ' 'prec delta'}
+  .maj-ligne .col-nom{grid-area:nom} .maj-ligne .col-champ{grid-area:champ}
+  .maj-ligne .col-prec{grid-area:prec;text-align:left!important;font-size:12px} .maj-ligne .col-delta{grid-area:delta;font-size:12px}
+  .maj-entete{display:none}
+  .maj-pied{bottom:calc(64px + env(safe-area-inset-bottom));padding:10px 14px;gap:8px}
+  .maj-pied .total{min-width:0;width:100%}
+  .maj-pied .total .sous{display:none}
+  .maj-pied .total strong{font-size:19px}
+  .maj-boutons{width:100%} .maj-boutons .btn{flex:1}
+  .titre-page .champ{width:100%!important}
+  .champs{grid-template-columns:1fr}
+  .toasts{bottom:90px}
+  .cache-mobile{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="ecran-connexion" class="connexion" hidden>
+  <div class="connexion-carte">
+    <svg width="54" height="54" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1a3c2e"/><path d="M5 24 12.5 11l4.5 7.5 3-4.5L27 24Z" fill="#e9dcae"/></svg>
+    <h1>Apogée</h1>
+    <p>Suivi de patrimoine</p>
+    <button id="btn-google" class="btn btn-primaire" style="width:100%;padding:11px">Se connecter avec Google</button>
+    <p id="connexion-erreur" class="erreur" hidden></p>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="entete">
+    <div class="entete-in">
+      <a class="marque" href="#/tableau">
+        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1a3c2e"/><path d="M5 24 12.5 11l4.5 7.5 3-4.5L27 24Z" fill="#e9dcae"/></svg>
+        Apogée
+      </a>
+      <nav class="nav" id="nav" aria-label="Navigation">
+        <a href="#/tableau" data-page="tableau"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.2"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.2"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.2"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.2"/></svg><span>Tableau de bord</span></a>
+        <a href="#/maj" data-page="maj"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg><span>Mise à jour</span></a>
+        <a href="#/historique" data-page="historique"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.5V8l2.3 1.6"/></svg><span>Historique</span></a>
+        <a href="#/projection" data-page="projection"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12.5 6 8l3 3 5.5-6"/><path d="M11 5h3.5v3.5"/></svg><span>Projection</span></a>
+        <a href="#/comptes" data-page="comptes"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h8"/></svg><span>Comptes</span></a>
+      </nav>
+      <div class="filtre" id="filtre" role="group" aria-label="Afficher le patrimoine de">
+        <button type="button" data-filtre="foyer">Couple</button>
+        <button type="button" data-filtre="clement">Clément</button>
+        <button type="button" data-filtre="alexandre">Alexandre</button>
+      <div class="entete-droite">
+        <span id="statut" class="statut"></span>
+        <a href="#/reglages" class="btn-icone" data-page="reglages" aria-label="Réglages" title="Réglages"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg></a>
+      </div>
+      </div>
+    </div>
+  </header>
+  <main id="page" class="page"><div class="chargement">Chargement…</div></main>
+</div>
+
+<dialog id="dialogue"></dialog>
+<dialog id="confirmation"></dialog>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     MODÈLE : calculs purs (aucun accès au DOM ni au stockage).
+     Testé en dehors du navigateur — ne rien y ajouter qui touche la page.
+     ═══════════════════════════════════════════════════════════════════ -->
+<script id="model">
+(function (root) {
+'use strict';
+
+const TYPES = {
+  livret:      { label: 'Livret réglementé',   cat: 'liquidites' },
+  courant:     { label: 'Compte courant',      cat: 'liquidites' },
+  pea:         { label: 'PEA',                 cat: 'placements' },
+  cto:         { label: 'Compte-titres',       cat: 'placements' },
+  av:          { label: 'Assurance-vie',       cat: 'placements' },
+  pee:         { label: 'Épargne salariale',   cat: 'salariale' },
+  per:         { label: 'PER',                 cat: 'salariale' },
+  crypto:      { label: 'Crypto',              cat: 'crypto' },
+  obligations: { label: 'Prêts / crowdfunding', cat: 'obligations' },
+  immobilier:  { label: 'Immobilier',          cat: 'immobilier' },
+  autre:       { label: 'Autre',               cat: 'autre' },
+};
+const CATEGORIES = {
+  immobilier:  'Immobilier (net des crédits)',
+  liquidites:  'Liquidités',
+  placements:  'Bourse & assurance-vie',
+  salariale:   'Épargne salariale & retraite',
+  crypto:      'Crypto',
+  obligations: 'Prêts & crowdfunding',
+  autre:       'Autre',
+};
+const PROPRIETAIRES = { couple: 'Couple', clement: 'Clément', alexandre: 'Alexandre' };
+const FILTRES = { foyer: 'Couple', clement: 'Clément', alexandre: 'Alexandre' };
+
+const r2 = n => Math.round((+n || 0) * 100) / 100;
+const pad = n => String(n).padStart(2, '0');
+
+// Quote-part d'un compte selon la vue : la seule règle de partage de l'application.
+// Vue « Couple » = tout le foyer. Un compte du couple compte pour 50 % dans la vue de chacun.
+function part(proprietaire, filtre) {
+  if (!filtre || filtre === 'foyer') return 1;
+  if (proprietaire === filtre) return 1;
+  if (proprietaire === 'clement' || proprietaire === 'alexandre') return 0;
+  return 0.5;
+}
+
+// ── Dates (toujours en heure locale, format AAAA-MM-JJ / AAAA-MM) ──
+function dateISO(d = new Date()) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function moisDe(iso) { return String(iso).slice(0, 7); }
+function ajouterMois(mois, k) {
+  const [y, m] = mois.split('-').map(Number);
+  const t = y * 12 + (m - 1) + k;
+  return Math.floor(t / 12) + '-' + pad((t % 12 + 12) % 12 + 1);
+}
+function ecartMois(a, b) { // nombre de mois de a à b
+  const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number);
+  return (yb - ya) * 12 + (mb - ma);
+}
+
+// ── Crédits ──
+// Capital restant dû à un mois donné : la ligne du mois est considérée comme payée.
+function crdA(credit, mois) {
+  const e = credit.echeancier || [];
+  if (!e.length || mois < e[0].m) return +credit.crdInitial || (e[0] ? e[0].crd : 0);
+  if (mois > e[e.length - 1].m) return 0;
+  let v = e[0].crd;
+  for (const r of e) { if (r.m <= mois) v = r.crd; else break; }
+  return v;
+}
+function finCredit(credit) {
+  const e = credit.echeancier || [];
+  if (!e.length) return null;
+  const z = e.find(r => r.crd <= 0.005);
+  return z ? z.m : ajouterMois(e[e.length - 1].m, 1);
+}
+function dettesCompte(credits, compteId, mois) {
+  let s = 0;
+  for (const c of credits) if (c.compteId === compteId) s += crdA(c, mois);
+  return r2(s);
+}
+// Échéancier à partir d'une saisie simple : CRD de ce mois, taux, mensualité.
+function genererEcheancier(crdActuel, tauxAnnuel, mensualite, moisDepart) {
+  const tm = (+tauxAnnuel || 0) / 100 / 12;
+  let crd = r2(crdActuel);
+  if (!(crd > 0)) throw new Error('Le capital restant dû doit être positif.');
+  if (!(mensualite > 0)) throw new Error('La mensualité doit être positive.');
+  if (crd * tm >= mensualite) throw new Error('La mensualité ne couvre pas les intérêts : vérifie le taux et la mensualité.');
+  const ech = [{ m: moisDepart, crd }];
+  let m = moisDepart;
+  for (let i = 0; i < 720 && crd > 0; i++) {
+    crd = r2(Math.max(0, crd - (mensualite - crd * tm)));
+    m = ajouterMois(m, 1);
+    ech.push({ m, crd });
+  }
+  return { crdInitial: r2(crdActuel), echeancier: ech };
+}
+
+// ── Lecture d'un tableau d'amortissement (lignes d'un Excel/CSV) ──
+const MOIS_FR = { janv: 1, janvier: 1, fevr: 2, fev: 2, fevrier: 2, mars: 3, avr: 4, avril: 4, mai: 5, juin: 6, juil: 7, juillet: 7, aout: 8, sept: 9, septembre: 9, oct: 10, octobre: 10, nov: 11, novembre: 11, dec: 12, decembre: 12 };
+const sansAccent = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function lireNombre(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  if (v == null) return null;
+  let s = String(v).replace(/[\s  €]/g, '');
+  if (!s) return null;
+  if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.');
+  else s = s.replace(',', '.');
+  const n = Number(s);
+  return isFinite(n) ? n : null;
+}
+function lireMois(v) {
+  if (v instanceof Date && !isNaN(v)) return v.getFullYear() + '-' + pad(v.getMonth() + 1);
+  if (typeof v === 'number' && v > 20000 && v < 80000) { // date série Excel
+    const d = new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86400000);
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1);
+  }
+  const s = sansAccent(String(v || '').trim());
+  let m;
+  if ((m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/))) return m[3] + '-' + pad(+m[2]);
+  if ((m = s.match(/^(\d{1,2})[\/.\-](\d{4})$/))) return m[2] + '-' + pad(+m[1]);
+  if ((m = s.match(/^(\d{4})[\/.\-](\d{1,2})/))) return m[1] + '-' + pad(+m[2]);
+  if ((m = s.match(/^([a-z]+)\.?\s+(\d{4})$/)) && MOIS_FR[m[1]]) return m[2] + '-' + pad(MOIS_FR[m[1]]);
+  return null;
+}
+function parserTableauAmortissement(lignes) {
+  const KW_DATE = ['date', 'echeance', 'periode', 'mois'];
+  const KW_CRD = ['capital restant', 'restant du', 'crd', 'capital du', 'solde restant', 'encours', 'capital apres'];
+  let entete = -1, colDate = -1, colCrd = -1;
+  for (let i = 0; i < Math.min(25, lignes.length) && entete < 0; i++) {
+    const cells = (lignes[i] || []).map(c => sansAccent(c == null ? '' : c).trim());
+    const cand = [];
+    let d = -1;
+    cells.forEach((c, j) => {
+      if (!c) return;
+      if (KW_CRD.some(k => c.includes(k))) cand.push([j, c]);
+      else if (d < 0 && KW_DATE.some(k => c.includes(k))) d = j;
+    });
+    if (d >= 0 && cand.length) {
+      const fin = cand.find(([, c]) => /\bfin\b|apres/.test(c));
+      const pasDebut = cand.filter(([, c]) => !/debut/.test(c));
+      colCrd = (fin || pasDebut[pasDebut.length - 1] || cand[cand.length - 1])[0];
+      colDate = d; entete = i;
+    }
+  }
+  if (entete < 0) throw new Error('Colonnes « Date » et « Capital restant dû » introuvables dans le fichier.');
+  const parMois = new Map();
+  for (let i = entete + 1; i < lignes.length; i++) {
+    const l = lignes[i] || [];
+    const m = lireMois(l[colDate]), crd = lireNombre(l[colCrd]);
+    if (m && crd != null && crd >= 0) parMois.set(m, r2(crd));
+  }
+  const ech = [...parMois.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([m, crd]) => ({ m, crd }));
+  if (ech.length < 2) throw new Error('Aucune échéance lisible trouvée sous l’en-tête.');
+  return { crdInitial: ech[0].crd, echeancier: ech };
+}
+
+// ── Situation actuelle ──
+const parOrdre = (a, b) => ((a.ordre ?? 0) - (b.ordre ?? 0)) || String(a.nom).localeCompare(String(b.nom), 'fr');
+function comptesActifs(state) { return state.comptes.filter(c => c.actif !== false).sort(parOrdre); }
+function totaliser(lignes) {
+  let brut = 0, dettes = 0, net = 0;
+  const parCategorie = {};
+  for (const l of lignes) {
+    brut += l.brut * l.part; dettes += l.dettes * l.part; net += l.net * l.part;
+    const cat = (TYPES[l.compte.type] || TYPES.autre).cat;
+    parCategorie[cat] = (parCategorie[cat] || 0) + l.net * l.part;
+  }
+  Object.keys(parCategorie).forEach(k => { parCategorie[k] = r2(parCategorie[k]); });
+  return { lignes, brut: r2(brut), dettes: r2(dettes), net: r2(net), parCategorie };
+}
+function situation(state, filtre, iso = dateISO()) {
+  const mois = moisDe(iso);
+  return totaliser(comptesActifs(state).map(c => {
+    const brut = +c.valeur || 0, dettes = dettesCompte(state.credits, c.id, mois);
+    return { compte: c, brut, dettes, net: r2(brut - dettes), part: part(c.proprietaire, filtre) };
+  }));
+}
+
+// ── Historique ──
+function snapshotTotaux(state, snap, filtre) {
+  const parId = new Map(state.comptes.map(c => [c.id, c]));
+  const ids = new Set([...Object.keys(snap.valeurs || {}), ...Object.keys(snap.dettes || {})]);
+  return totaliser([...ids].map(id => {
+    const c = parId.get(id) || { id, nom: '(compte supprimé)', type: 'autre', proprietaire: 'couple', ordre: 999 };
+    const brut = +(snap.valeurs || {})[id] || 0, dettes = +(snap.dettes || {})[id] || 0;
+    return { compte: c, brut, dettes, net: r2(brut - dettes), part: part(c.proprietaire, filtre) };
+  }).sort((a, b) => parOrdre(a.compte, b.compte)));
+}
+function historique(state, filtre) {
+  return [...state.snapshots].sort((a, b) => a.date.localeCompare(b.date))
+    .map(s => Object.assign({ snapshot: s }, snapshotTotaux(state, s, filtre)));
+}
+// Snapshot « figé » : valeurs saisies + dettes calculées à la date.
+function construireSnapshot(state, date, valeurs) {
+  const mois = moisDe(date), dettes = {};
+  for (const c of state.comptes) {
+    if (!(c.id in valeurs)) continue;
+    const d = dettesCompte(state.credits, c.id, mois);
+    if (d) dettes[c.id] = d;
+  }
+  const v = {};
+  Object.keys(valeurs).forEach(id => { v[id] = r2(valeurs[id]); });
+  return { id: date, date, valeurs: v, dettes };
+}
+
+// ── Projection ──
+function aDesHypotheses(state) { return comptesActifs(state).some(c => +c.taux || +c.versement); }
+function croissance(c, k) {
+  const v = +c.valeur || 0, t = +c.taux || 0, vm = +c.versement || 0;
+  if (!t && !vm) return v;
+  const r = Math.pow(1 + t / 100, 1 / 12) - 1; // taux mensuel équivalent
+  if (Math.abs(r) < 1e-12) return v + vm * k;
+  const f = Math.pow(1 + r, k);
+  return v * f + vm * (f - 1) / r;
+}
+// k = 0 correspond exactement à la situation du jour : la courbe part du net réel.
+function projection(state, filtre, horizonMois, iso = dateISO()) {
+  const m0 = moisDe(iso), comptes = comptesActifs(state), pts = [];
+  for (let k = 0; k <= horizonMois; k++) {
+    const mois = ajouterMois(m0, k);
+    let brut = 0, dettes = 0, net = 0;
+    for (const c of comptes) {
+      const p = part(c.proprietaire, filtre);
+      if (!p) continue;
+      const b = croissance(c, k), d = dettesCompte(state.credits, c.id, mois);
+      brut += b * p; dettes += d * p; net += r2(b - d) * p; // même calcul que situation()
+    }
+    pts.push({ mois, k, brut: r2(brut), dettes: r2(dettes), net: r2(net) });
+  }
+  return pts;
+}
+
+// ── Import / export ──
+function validerDonnees(d) {
+  if (!d || d.format !== 'apogee-v2') throw new Error('Ce fichier n’est pas une sauvegarde Apogée V2.');
+  for (const k of ['comptes', 'credits', 'snapshots']) if (!Array.isArray(d[k])) throw new Error(`Section « ${k} » manquante.`);
+  const ids = new Set();
+  d.comptes.forEach((c, i) => {
+    if (!c.id || !c.nom) throw new Error(`Compte n°${i + 1} incomplet.`);
+    if (ids.has(c.id)) throw new Error(`Identifiant de compte en double : ${c.id}`);
+    ids.add(c.id);
+    if (!TYPES[c.type]) throw new Error(`Type inconnu pour ${c.nom} : ${c.type}`);
+    if (!PROPRIETAIRES[c.proprietaire]) throw new Error(`Propriétaire inconnu pour ${c.nom}`);
+  });
+  d.credits.forEach(c => {
+    if (!c.id || !ids.has(c.compteId)) throw new Error(`Crédit ${c.nom || c.id} rattaché à un compte inconnu.`);
+    if (!Array.isArray(c.echeancier)) throw new Error(`Échéancier manquant pour ${c.nom || c.id}.`);
+  });
+  d.snapshots.forEach(s => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date || '') || typeof s.valeurs !== 'object') throw new Error(`Snapshot invalide : ${s.date || '?'}`);
+  });
+  return {
+    comptes: d.comptes.map(c => Object.assign({ groupe: '', ordre: 0, taux: null, versement: null, actif: true }, c)),
+    credits: d.credits.map(c => Object.assign({}, c)),
+    snapshots: d.snapshots.map(s => Object.assign({ dettes: {} }, s, { id: s.date })),
+    reglages: d.reglages || {},
+  };
+}
+function exporter(state) {
+  return { format: 'apogee-v2', version: 1, exporteLe: new Date().toISOString(),
+    comptes: state.comptes, credits: state.credits, snapshots: state.snapshots, reglages: state.reglages || {} };
+}
+
+root.Model = { TYPES, CATEGORIES, PROPRIETAIRES, FILTRES, r2, part, dateISO, moisDe, ajouterMois, ecartMois,
+  crdA, finCredit, dettesCompte, genererEcheancier, lireNombre, lireMois, parserTableauAmortissement,
+  comptesActifs, parOrdre, situation, snapshotTotaux, historique, construireSnapshot,
+  aDesHypotheses, croissance, projection, validerDonnees, exporter };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     APPLICATION
+     ═══════════════════════════════════════════════════════════════════ -->
+<script type="module">
+// ── Configuration Firebase ────────────────────────────────────────────
+// Colle ici le bloc « firebaseConfig » de ton projet (Console Firebase →
+// Paramètres du projet → Vos applications → Application Web).
+// Tant que apiKey est vide, l'application tourne en MODE LOCAL (données
+// stockées dans ce navigateur uniquement).
+const FIREBASE_CONFIG = {
+  apiKey: '',
+  authDomain: '',
+  projectId: '',
+  storageBucket: '',
+  messagingSenderId: '',
+  appId: '',
+};
+// Adresse Google autorisée (la vraie protection reste les règles Firestore).
+const EMAIL_AUTORISE = '';
+const FIREBASE_VERSION = '10.12.2';
+const VERSION_APP = '2.0.0';
+
+const M = window.Model;
+const $ = (sel, el = document) => el.querySelector(sel);
+const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+
+// ── Formats ───────────────────────────────────────────────────────────
+const nf0 = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const nf2 = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const eur = (n, dec = 0) => (dec ? nf2 : nf0).format(Math.abs(n) < 0.005 ? 0 : n);
+const eurSigne = (n, dec = 0) => (n > 0.004 ? '+' : n < -0.004 ? '−' : '') + eur(Math.abs(n), dec);
+const classeSigne = n => n > 0.004 ? 'pos' : n < -0.004 ? 'neg' : 'muted';
+const pct = n => (Math.round(n * 10) / 10).toLocaleString('fr-FR') + ' %';
+const dateFr = iso => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+const dateCourte = iso => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+const moisFr = m => new Date(m + '-15T12:00:00').toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+const moisLong = m => new Date(m + '-15T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+const saisie = n => (n == null || n === '') ? '' : (Number.isInteger(+n) ? String(+n) : (+n).toFixed(2).replace('.', ','));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nouvelId = () => 'c-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const joursDepuis = iso => Math.round((new Date(M.dateISO() + 'T12:00:00') - new Date(iso + 'T12:00:00')) / 86400000);
+
+// ── État de l'interface ───────────────────────────────────────────────
+const pref = (k, def) => { try { return localStorage.getItem('apogee.' + k) ?? def; } catch { return def; } };
+const setPref = (k, v) => { try { localStorage.setItem('apogee.' + k, v); } catch {} };
+const ui = {
+  page: 'tableau',
+  filtre: pref('filtre', 'foyer'),
+  horizon: +pref('horizon', 20),
+  histSel: null,
+  histEdition: false,
+  maj: null,           // brouillon de la mise à jour mensuelle
+};
+let state = null;      // { comptes, credits, snapshots, reglages }
+let store = null;
+let charts = {};
+
+// ── Notifications ─────────────────────────────────────────────────────
+function toast(msg, type = '') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = `<div style="flex:1">${esc(msg)}</div><button aria-label="Fermer">×</button>`;
+  el.querySelector('button').onclick = () => el.remove();
+  $('#toasts').appendChild(el);
+  if (type !== 'erreur') setTimeout(() => el.remove(), 3500);
+}
+function messageErreur(e) {
+  const code = e && e.code || '';
+  if (code === 'permission-denied') return 'Accès refusé par Firebase : vérifie les règles de sécurité et l’adresse e-mail autorisée.';
+  if (code === 'unavailable') return 'Firebase est injoignable pour le moment : les modifications seront envoyées au retour du réseau.';
+  return (e && e.message) || String(e);
+}
+// Toute écriture passe par ici : l'échec est toujours affiché, jamais silencieux.
+function ecrire(promesse) {
+  return Promise.resolve(promesse).catch(e => { console.error(e); toast('Échec de l’enregistrement : ' + messageErreur(e), 'erreur'); throw e; });
+}
+function statut({ etat, message }) {
+  const el = $('#statut');
+  const libelles = { local: 'Mode local', ok: 'Synchronisé', attente: 'Enregistrement…', horsligne: 'Hors ligne', erreur: 'Erreur de synchro' };
+  el.className = 'statut ' + (etat === 'horsligne' ? 'attente' : etat);
+  el.textContent = libelles[etat] || '';
+  el.title = etat === 'local' ? 'Données enregistrées dans ce navigateur uniquement (Firebase non configuré).'
+    : etat === 'horsligne' ? 'Les modifications seront envoyées au retour du réseau.' : (message || '');
+}
+
+// ── Dialogues ─────────────────────────────────────────────────────────
+function confirmer(titre, message, libelleOk = 'Confirmer', danger = false) {
+  const dlg = $('#confirmation');
+  dlg.innerHTML = `<div class="dlg-tete">${esc(titre)}</div><div class="dlg-corps"><p class="text2">${message}</p></div>
+    <div class="dlg-pied"><button class="btn" value="non">Annuler</button><button class="btn ${danger ? 'btn-danger' : 'btn-primaire'}" value="oui">${esc(libelleOk)}</button></div>`;
+  return new Promise(res => {
+    dlg.querySelectorAll('button').forEach(b => b.onclick = () => { dlg.close(); res(b.value === 'oui'); });
+    dlg.oncancel = () => res(false);
+    dlg.showModal();
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// STOCKAGE
+// ══════════════════════════════════════════════════════════════════════
+const clone = o => JSON.parse(JSON.stringify(o));
+const VIDE = () => ({ comptes: [], credits: [], snapshots: [], reglages: {} });
+
+function creerStoreLocal(onData) {
+  const CLE = 'apogee-v2-donnees';
+  let data;
+  try { data = JSON.parse(localStorage.getItem(CLE)) || VIDE(); } catch { data = VIDE(); }
+  const sauver = () => { localStorage.setItem(CLE, JSON.stringify(data)); onData(clone(data)); };
+  const upsert = (col, doc) => { const i = data[col].findIndex(x => x.id === doc.id); if (i >= 0) data[col][i] = doc; else data[col].push(doc); };
+  const op = f => async (...a) => { f(...a); sauver(); };
+  return {
+    mode: 'local',
+    demarrer() { statut({ etat: 'local' }); onData(clone(data)); },
+    enregistrerCompte: op(c => upsert('comptes', c)),
+    supprimerCompte: op(id => { data.comptes = data.comptes.filter(x => x.id !== id); data.credits = data.credits.filter(x => x.compteId !== id); }),
+    enregistrerCredit: op(c => upsert('credits', c)),
+    supprimerCredit: op(id => { data.credits = data.credits.filter(x => x.id !== id); }),
+    enregistrerSnapshot: op((s, comptes = []) => { upsert('snapshots', s); comptes.forEach(c => upsert('comptes', c)); }),
+    supprimerSnapshot: op(id => { data.snapshots = data.snapshots.filter(x => x.id !== id); }),
+    enregistrerReglages: op(r => { data.reglages = r; }),
+    remplacerTout: op(d => { data = clone(d); }),
+    arreter() {},
+  };
+}
+
+async function creerStoreFirebase(db, fs, uid, onData) {
+  const { collection, doc, onSnapshot, setDoc, writeBatch } = fs;
+  const COLS = ['comptes', 'credits', 'snapshots'];
+  const data = VIDE();
+  const charge = { comptes: false, credits: false, snapshots: false, reglages: false };
+  const attente = {};
+  const desabonnements = [];
+  const ref = (col, id) => doc(db, 'users', uid, col, id);
+  const sansId = o => { const { id, ...r } = o; return JSON.parse(JSON.stringify(r)); };
+  const majStatut = () => statut({ etat: !navigator.onLine ? 'horsligne' : Object.values(attente).some(Boolean) ? 'attente' : 'ok' });
+  const emettre = () => { if (Object.values(charge).every(Boolean)) onData(clone(data)); };
+  const surErreur = e => { console.error(e); statut({ etat: 'erreur', message: messageErreur(e) }); toast('Lecture impossible : ' + messageErreur(e), 'erreur'); };
+
+  for (const col of COLS) {
+    desabonnements.push(onSnapshot(collection(db, 'users', uid, col), { includeMetadataChanges: true }, snap => {
+      data[col] = snap.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
+      attente[col] = snap.metadata.hasPendingWrites; charge[col] = true;
+      majStatut(); emettre();
+    }, surErreur));
+  }
+  desabonnements.push(onSnapshot(ref('reglages', 'principal'), { includeMetadataChanges: true }, snap => {
+    data.reglages = snap.exists() ? snap.data() : {};
+    attente.reglages = snap.metadata.hasPendingWrites; charge.reglages = true;
+    majStatut(); emettre();
+  }, surErreur));
+  addEventListener('online', majStatut); addEventListener('offline', majStatut);
+
+  const lot = async ops => { // ops : [['set'|'delete', col, id, données?]] — découpé par 450
+    for (let i = 0; i < ops.length; i += 450) {
+      const b = writeBatch(db);
+      ops.slice(i, i + 450).forEach(([t, col, id, d]) => t === 'set' ? b.set(ref(col, id), sansId(d)) : b.delete(ref(col, id)));
+      await b.commit();
+    }
+  };
+  return {
+    mode: 'firebase',
+    demarrer() {},
+    enregistrerCompte: c => setDoc(ref('comptes', c.id), sansId(c)),
+    supprimerCompte: id => lot([['delete', 'comptes', id], ...data.credits.filter(c => c.compteId === id).map(c => ['delete', 'credits', c.id])]),
+    enregistrerCredit: c => setDoc(ref('credits', c.id), sansId(c)),
+    supprimerCredit: id => lot([['delete', 'credits', id]]),
+    enregistrerSnapshot: (s, comptes = []) => lot([['set', 'snapshots', s.id, s], ...comptes.map(c => ['set', 'comptes', c.id, c])]),
+    supprimerSnapshot: id => lot([['delete', 'snapshots', id]]),
+    enregistrerReglages: r => setDoc(ref('reglages', 'principal'), sansId(r)),
+    remplacerTout: d => lot([
+      ...COLS.flatMap(col => data[col].filter(x => !d[col].some(y => y.id === x.id)).map(x => ['delete', col, x.id])),
+      ...COLS.flatMap(col => d[col].map(x => ['set', col, x.id, x])),
+      ['set', 'reglages', 'principal', d.reglages || {}],
+    ]),
+    arreter() { desabonnements.forEach(u => u()); },
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGES
+// ══════════════════════════════════════════════════════════════════════
+const filtreLib = () => M.FILTRES[ui.filtre];
+const badge = p => `<span class="badge ${p}">${esc(M.PROPRIETAIRES[p] || p)}</span>`;
+const typeLib = t => (M.TYPES[t] || M.TYPES.autre).label;
+const snapsTries = () => [...state.snapshots].sort((a, b) => a.date.localeCompare(b.date));
+const creditsDe = id => state.credits.filter(c => c.compteId === id);
+
+function detruireGraphs() { Object.values(charts).forEach(c => c.destroy()); charts = {}; }
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function vueVide() {
+  return `<div class="carte vide">
+    <h2>Bienvenue dans Apogée V2</h2>
+    <p>Aucune donnée pour l’instant. Importe ta sauvegarde <strong>apogee-v2-donnees.json</strong> pour retrouver tes comptes et ton historique, ou crée ton premier compte.</p>
+    <button class="btn btn-primaire" data-action="importer">Importer une sauvegarde</button>
+    <a class="btn" href="#/comptes" style="margin-left:6px">Créer un compte</a>
+  </div>`;
+}
+
+// Points de l'historique regroupés par mois (dernier snapshot du mois) pour les courbes.
+function serieMensuelle(hist) {
+  const parMois = new Map();
+  hist.forEach(h => parMois.set(M.moisDe(h.snapshot.date), h));
+  return parMois;
+}
+
+function optionsGraph({ min, legende = false } = {}) {
+  const grille = css('--border'), texte = css('--text3');
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: legende, labels: { color: css('--text2'), boxWidth: 18, boxHeight: 2 } },
+      tooltip: { filter: i => i.parsed.y != null, callbacks: { label: c => ` ${c.dataset.label} : ${eur(c.parsed.y)}` } },
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: texte, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+      y: { min, grid: { color: grille }, border: { display: false },
+        ticks: { color: texte, callback: v => Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' M€' : Math.round(v / 1000).toLocaleString('fr-FR') + ' k€' } },
+    },
+  };
+}
+
+// ── Tableau de bord ───────────────────────────────────────────────────
+function pageTableau() {
+  if (!state.comptes.length) return vueVide();
+  const s = M.situation(state, ui.filtre);
+  const hist = M.historique(state, ui.filtre);
+  const dernier = hist[hist.length - 1], avant = hist[hist.length - 2], premier = hist[0];
+  const pastilles = [];
+  if (dernier && Math.abs(s.net - dernier.net) >= 1) pastilles.push(`Depuis le ${dateCourte(dernier.snapshot.date)} : <strong class="${classeSigne(s.net - dernier.net)}">${eurSigne(s.net - dernier.net)}</strong>`);
+  if (dernier && avant) pastilles.push(`Dernière mise à jour : <strong class="${classeSigne(dernier.net - avant.net)}">${eurSigne(dernier.net - avant.net)}</strong>`);
+  if (dernier && premier && premier !== dernier) pastilles.push(`Depuis ${moisLong(M.moisDe(premier.snapshot.date))} : <strong class="${classeSigne(dernier.net - premier.net)}">${eurSigne(dernier.net - premier.net)}</strong>`);
+
+  const cats = Object.entries(s.parCategorie).filter(([, v]) => Math.abs(v) >= 0.5).sort((a, b) => b[1] - a[1]);
+  const totalPos = cats.reduce((t, [, v]) => t + Math.max(0, v), 0) || 1;
+  const repartition = cats.map(([k, v]) => `
+    <div class="rep-ligne"><span>${esc(M.CATEGORIES[k] || k)}</span><span class="num">${eur(v)} <span class="muted">· ${pct(Math.max(0, v) / totalPos * 100)}</span></span>
+    <div class="rep-barre"><span style="width:${Math.max(0, v) / totalPos * 100}%;background:var(--cat-${k})"></span></div></div>`).join('');
+
+  let personnes = '';
+  if (ui.filtre === 'foyer') {
+    const c = M.situation(state, 'clement').net, a = M.situation(state, 'alexandre').net;
+    personnes = `<div class="sep"></div><div class="sous-titre">Par personne <span class="muted" style="font-weight:400">(comptes du couple partagés 50/50)</span></div>
+      <div class="repartition">${[['Clément', c], ['Alexandre', a]].map(([n, v]) => `<div class="rep-ligne"><span>${n}</span><span class="num">${eur(v)}</span></div>`).join('')}</div>`;
+  }
+
+  const obj = state.reglages && state.reglages.objectif;
+  const objectif = obj && obj.montant ? `<div class="carte"><h2>Objectif <span class="muted num" style="font-weight:400">${eur(obj.montant)} en ${obj.annee}</span></h2>
+      <div class="objectif-barre"><span style="width:${Math.min(100, Math.max(0, s.net / obj.montant * 100))}%"></span></div>
+      <div class="sous">${pct(s.net / obj.montant * 100)} atteint · reste ${eur(Math.max(0, obj.montant - s.net))}</div></div>` : '';
+
+  const jours = dernier ? joursDepuis(dernier.snapshot.date) : null;
+  return `
+    <div class="grille g-2">
+      <div class="carte hero">
+        <div class="hero-label">Patrimoine net · ${esc(filtreLib())}</div>
+        <div class="hero-valeur num">${eur(s.net)}</div>
+        <div class="hero-sous">Brut <span class="num">${eur(s.brut)}</span> · Crédits <span class="num">−${eur(s.dettes)}</span></div>
+        <div class="pastilles">${pastilles.map(p => `<span class="pastille">${p}</span>`).join('')}</div>
+        <div class="graph graph-hero"><canvas id="g-tableau"></canvas></div>
+      </div>
+      <div class="pile">
+        <div class="carte maj-cta">
+          <div><div style="font-weight:600">Mise à jour mensuelle</div>
+          <div class="sous">${dernier ? `Dernière le ${dateFr(dernier.snapshot.date)}${jours > 0 ? ` (il y a ${jours} jour${jours > 1 ? 's' : ''})` : ' (aujourd’hui)'}` : 'Aucune pour l’instant'}</div></div>
+          <a class="btn btn-primaire" href="#/maj">Mettre à jour</a>
+        </div>
+        <div class="carte"><h2>Répartition</h2><div class="repartition">${repartition || '<span class="muted">—</span>'}</div>${personnes}</div>
+        ${objectif}
+      </div>
+    </div>`;
+}
+function graphTableau() {
+  const el = $('#g-tableau');
+  if (!el || typeof Chart === 'undefined') return;
+  const hist = M.historique(state, ui.filtre);
+  if (hist.length < 2) { el.parentElement.innerHTML = '<p class="muted" style="padding-top:60px;text-align:center">La courbe apparaîtra après deux mises à jour.</p>'; return; }
+  const parMois = serieMensuelle(hist);
+  const m0 = M.moisDe(hist[0].snapshot.date), m1 = M.moisDe(hist[hist.length - 1].snapshot.date);
+  const mois = Array.from({ length: M.ecartMois(m0, m1) + 1 }, (_, i) => M.ajouterMois(m0, i));
+  const acc = css('--accent');
+  charts.tableau = new Chart(el, {
+    type: 'line',
+    data: { labels: mois.map(moisFr), datasets: [{ label: 'Patrimoine net', data: mois.map(m => parMois.has(m) ? parMois.get(m).net : null), spanGaps: true,
+      borderColor: acc, backgroundColor: acc + '22', fill: true, tension: .25, pointRadius: 3, pointBackgroundColor: acc, borderWidth: 2 }] },
+    options: optionsGraph(),
+  });
+}
+
+// ── Mise à jour mensuelle ─────────────────────────────────────────────
+function initMaj() {
+  const actifs = M.comptesActifs(state);
+  if (!ui.maj) ui.maj = { date: M.dateISO(), valeurs: {} };
+  actifs.forEach(c => { if (!(c.id in ui.maj.valeurs)) ui.maj.valeurs[c.id] = saisie(c.valeur); });
+}
+function snapAvant(date) { return snapsTries().filter(s => s.date < date).pop() || null; }
+function pageMaj() {
+  if (!state.comptes.length) return vueVide();
+  initMaj();
+  const actifs = M.comptesActifs(state);
+  const prec = snapAvant(ui.maj.date);
+  const existe = state.snapshots.find(s => s.date === ui.maj.date);
+  const mois = M.moisDe(ui.maj.date);
+  const groupes = ['couple', 'clement', 'alexandre'].map(p => [p, actifs.filter(c => c.proprietaire === p)]).filter(([, l]) => l.length);
+  const lignes = groupes.map(([p, liste]) => `
+    <div class="section-titre"><span>${esc(M.PROPRIETAIRES[p])}</span></div>
+    <div class="carte" style="padding:6px 16px">
+      <div class="maj-ligne maj-entete"><span>Compte</span><span class="d" style="text-align:right">Précédent</span><span style="text-align:right">Valeur au ${dateCourte(ui.maj.date)}</span><span style="text-align:right">Variation</span></div>
+      ${liste.map(c => {
+        const pv = prec && prec.valeurs[c.id] != null ? prec.valeurs[c.id] : null;
+        const dettes = M.dettesCompte(state.credits, c.id, mois);
+        const sousLigne = c.type === 'immobilier' && dettes
+          ? `Valeur du bien · crédits au ${moisFr(mois)} : <span class="num">−${eur(dettes)}</span> (automatique)`
+          : esc(typeLib(c.type) + (c.groupe ? ' · ' + c.groupe : ''));
+        return `<div class="maj-ligne">
+          <div class="col-nom"><div class="nom-compte">${esc(c.nom)}</div><div class="sous">${sousLigne}</div></div>
+          <div class="col-prec num muted" style="text-align:right">${pv != null ? eur(pv, 2) : '—'}</div>
+          <label class="champ-montant col-champ" data-champ="${esc(c.id)}"><input inputmode="decimal" autocomplete="off" data-maj="${esc(c.id)}" value="${esc(ui.maj.valeurs[c.id])}" aria-label="${esc(c.nom)}"><span>€</span></label>
+          <div class="col-delta num" style="text-align:right" data-delta="${esc(c.id)}"></div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+  return `
+    <div class="titre-page"><div><h1>Mise à jour mensuelle</h1><p>Corrige les montants qui ont bougé ; les crédits se calculent tout seuls.</p></div>
+      <div class="champ" style="width:170px"><label for="maj-date">Date du snapshot</label><input type="date" id="maj-date" value="${ui.maj.date}" max="${M.dateISO()}"></div></div>
+    ${existe ? `<div class="bandeau warn">Un snapshot existe déjà le ${dateFr(ui.maj.date)} : l’enregistrer le remplacera.</div>` : ''}
+    ${lignes}
+    <div class="maj-pied">
+      <div class="total"><div class="sous">Patrimoine net du couple à cette date</div><strong class="num" id="maj-total"></strong> <span class="num" id="maj-total-delta"></span></div>
+      <div class="maj-boutons"><button class="btn" data-action="maj-annuler">Annuler</button>
+      <button class="btn btn-primaire" data-action="maj-enregistrer">Enregistrer le snapshot</button></div>
+    </div>`;
+}
+function rafraichirMaj() {
+  if (ui.page !== 'maj' || !ui.maj) return;
+  const prec = snapAvant(ui.maj.date);
+  const valeurs = {};
+  let ok = true;
+  M.comptesActifs(state).forEach(c => {
+    const brut = ui.maj.valeurs[c.id];
+    const v = M.lireNombre(brut);
+    const champ = $(`[data-champ="${CSS.escape(c.id)}"]`);
+    if (champ) champ.classList.toggle('invalide', v == null);
+    if (v == null) { ok = false; return; }
+    valeurs[c.id] = v;
+    const d = $(`[data-delta="${CSS.escape(c.id)}"]`);
+    const pv = prec && prec.valeurs[c.id] != null ? prec.valeurs[c.id] : null;
+    if (d) { const diff = pv == null ? null : v - pv; d.className = 'col-delta num ' + (diff == null ? 'muted' : classeSigne(diff)); d.textContent = diff == null ? 'nouveau' : (Math.abs(diff) < 0.005 ? '=' : eurSigne(diff, 2)); }
+  });
+  const total = $('#maj-total'), delta = $('#maj-total-delta');
+  if (!total) return;
+  if (!ok) { total.textContent = 'Montant invalide'; delta.textContent = ''; return; }
+  const snap = M.construireSnapshot(state, ui.maj.date, valeurs);
+  const net = M.snapshotTotaux(state, snap, 'foyer').net;
+  total.textContent = eur(net);
+  if (prec) { const dn = net - M.snapshotTotaux(state, prec, 'foyer').net; delta.className = 'num ' + classeSigne(dn); delta.textContent = `${eurSigne(dn)} vs ${dateCourte(prec.date)}`; }
+}
+async function enregistrerMaj() {
+  const date = ui.maj.date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > M.dateISO()) return toast('Date invalide (pas de date future).', 'erreur');
+  const actifs = M.comptesActifs(state), valeurs = {};
+  for (const c of actifs) {
+    const v = M.lireNombre(ui.maj.valeurs[c.id]);
+    if (v == null) { toast(`Montant invalide pour « ${c.nom} ».`, 'erreur'); $(`[data-maj="${CSS.escape(c.id)}"]`)?.focus(); return; }
+    valeurs[c.id] = v;
+  }
+  if (state.snapshots.some(s => s.date === date) && !await confirmer('Remplacer le snapshot ?', `Un snapshot existe déjà le ${esc(dateFr(date))}. Il sera remplacé par ces valeurs.`, 'Remplacer')) return;
+  const snap = M.construireSnapshot(state, date, valeurs);
+  snap.enregistreLe = new Date().toISOString();
+  // Les valeurs actuelles des comptes ne suivent que le snapshot le plus récent (pas un rattrapage passé).
+  const plusRecent = !state.snapshots.some(s => s.date > date);
+  const majComptes = plusRecent ? actifs.filter(c => M.r2(c.valeur) !== M.r2(valeurs[c.id])).map(c => Object.assign({}, c, { valeur: M.r2(valeurs[c.id]) })) : [];
+  ecrire(store.enregistrerSnapshot(snap, majComptes)).then(() => {}, () => {});
+  ui.maj = null; ui.histSel = date; ui.histEdition = false;
+  toast(`Snapshot du ${dateFr(date)} enregistré.`);
+  location.hash = '#/historique';
+}
+
+// ── Historique ────────────────────────────────────────────────────────
+function pageHistorique() {
+  const hist = M.historique(state, ui.filtre);
+  if (!hist.length) return state.comptes.length
+    ? `<div class="carte vide"><h2>Pas encore d’historique</h2><p>Chaque mise à jour mensuelle ajoute un point ici.</p><a class="btn btn-primaire" href="#/maj">Faire la première mise à jour</a></div>`
+    : vueVide();
+  const premier = hist[0], dernier = hist[hist.length - 1];
+  const nbMois = Math.max(1, M.ecartMois(M.moisDe(premier.snapshot.date), M.moisDe(dernier.snapshot.date)));
+  if (!ui.histSel || !hist.some(h => h.snapshot.date === ui.histSel)) ui.histSel = dernier.snapshot.date;
+  const lignes = [...hist].reverse().map((h, i, arr) => {
+    const p = arr[i + 1], d = p ? h.net - p.net : null;
+    return `<tr class="cliquable ${h.snapshot.date === ui.histSel ? 'selection' : ''}" data-action="hist-select" data-date="${h.snapshot.date}">
+      <td>${dateFr(h.snapshot.date)}</td><td class="d num">${eur(h.net)}</td>
+      <td class="d num ${d == null ? 'muted' : classeSigne(d)}">${d == null ? '—' : eurSigne(d)}</td></tr>`;
+  }).join('');
+  return `
+    <div class="titre-page"><div><h1>Historique</h1><p>Vue ${esc(filtreLib())} · ${hist.length} mise${hist.length > 1 ? 's' : ''} à jour depuis ${moisLong(M.moisDe(premier.snapshot.date))}</p></div></div>
+    <div class="carte">
+      <div class="pastilles" style="margin:0 0 14px">
+        <span class="pastille">Évolution : <strong class="${classeSigne(dernier.net - premier.net)}">${eurSigne(dernier.net - premier.net)}</strong></span>
+        ${hist.length > 1 ? `<span class="pastille">Moyenne : <strong class="${classeSigne(dernier.net - premier.net)}">${eurSigne((dernier.net - premier.net) / nbMois)}</strong> / mois</span>` : ''}
+      </div>
+      <div class="graph-grand"><canvas id="g-hist"></canvas></div>
+    </div>
+    <div class="grille g-2" style="margin-top:16px">
+      <div class="carte"><h2>Snapshots</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Date</th><th class="d">Net</th><th class="d">Variation</th></tr></thead><tbody>${lignes}</tbody></table></div></div>
+      <div class="carte" id="hist-detail">${detailSnapshot(hist)}</div>
+    </div>`;
+}
+function detailSnapshot(hist) {
+  const i = hist.findIndex(h => h.snapshot.date === ui.histSel);
+  if (i < 0) return '';
+  const h = hist[i], p = hist[i - 1];
+  const precParId = new Map(p ? p.lignes.map(l => [l.compte.id, l]) : []);
+  if (ui.histEdition) {
+    return `<h2>Modifier le ${dateFr(h.snapshot.date)}</h2>
+      <p class="sous" style="margin-bottom:10px">Valeurs brutes saisies ce jour-là (les crédits restent figés à cette date).</p>
+      ${h.lignes.map(l => `<div class="maj-ligne" style="grid-template-columns:1fr 150px">
+        <div><div class="nom-compte">${esc(l.compte.nom)}</div><div class="sous">${l.dettes ? 'Crédits : −' + eur(l.dettes, 2) : esc(typeLib(l.compte.type))}</div></div>
+        <label class="champ-montant"><input inputmode="decimal" data-edit="${esc(l.compte.id)}" value="${esc(saisie(l.brut))}"><span>€</span></label></div>`).join('')}
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn" data-action="hist-annuler">Annuler</button><button class="btn btn-primaire" data-action="hist-sauver">Enregistrer</button></div>`;
+  }
+  const d = p ? h.net - p.net : null;
+  const lignes = h.lignes.filter(l => l.part > 0).map(l => {
+    const pl = precParId.get(l.compte.id), v = l.net * l.part, pv = pl ? pl.net * pl.part : null;
+    const dv = pv == null ? null : v - pv;
+    return `<tr><td><div class="nom-compte">${esc(l.compte.nom)}</div>${l.part < 1 ? '<div class="sous">quote-part 50 %</div>' : ''}</td>
+      <td class="d num">${eur(v)}</td><td class="d num ${dv == null ? 'muted' : classeSigne(dv)}">${dv == null ? '—' : (Math.abs(dv) < 0.5 ? '=' : eurSigne(dv))}</td></tr>`;
+  }).join('');
+  return `<h2><span>${dateFr(h.snapshot.date)}</span><span class="num">${eur(h.net)}</span></h2>
+    <p class="sous" style="margin:-6px 0 12px">${p ? `<span class="${classeSigne(d)}">${eurSigne(d)}</span> depuis le ${dateCourte(p.snapshot.date)} · ` : ''}brut ${eur(h.brut)} · crédits −${eur(h.dettes)}</p>
+    <div class="tab-scroll"><table class="tab"><thead><tr><th>Compte (net)</th><th class="d">Valeur</th><th class="d">Variation</th></tr></thead><tbody>${lignes}</tbody></table></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-petit btn-danger" data-action="hist-supprimer">Supprimer</button>
+      <button class="btn btn-petit" data-action="hist-modifier">Modifier les valeurs</button></div>`;
+}
+function graphHistorique() {
+  const el = $('#g-hist');
+  if (!el || typeof Chart === 'undefined') return;
+  const hist = M.historique(state, ui.filtre);
+  const parMois = serieMensuelle(hist);
+  const m0 = M.moisDe(hist[0].snapshot.date), m1 = M.moisDe(hist[hist.length - 1].snapshot.date);
+  const mois = Array.from({ length: M.ecartMois(m0, m1) + 1 }, (_, i) => M.ajouterMois(m0, i));
+  const acc = css('--accent');
+  const opts = optionsGraph();
+  opts.plugins.tooltip.callbacks.title = items => { const h = parMois.get(mois[items[0].dataIndex]); return h ? dateFr(h.snapshot.date) : ''; };
+  opts.onClick = (e, els) => { if (!els.length) return; const h = parMois.get(mois[els[0].index]); if (h) { ui.histSel = h.snapshot.date; ui.histEdition = false; setTimeout(rendre, 0); } };
+  charts.hist = new Chart(el, {
+    type: 'line',
+    data: { labels: mois.map(moisFr), datasets: [{ label: 'Patrimoine net', data: mois.map(m => parMois.has(m) ? parMois.get(m).net : null), spanGaps: true,
+      borderColor: acc, backgroundColor: acc + '1f', fill: true, tension: .25, borderWidth: 2.5,
+      pointRadius: mois.map(m => parMois.has(m) && parMois.get(m).snapshot.date === ui.histSel ? 7 : 4),
+      pointBackgroundColor: acc, pointBorderColor: css('--surface'), pointBorderWidth: 2 }] },
+    options: opts,
+  });
+}
+
+// ── Projection ────────────────────────────────────────────────────────
+function pageProjection() {
+  if (!state.comptes.length) return vueVide();
+  const pts = M.projection(state, ui.filtre, ui.horizon * 12);
+  const jalons = [0, 12, 60, 120, ui.horizon * 12].filter((k, i, a) => k <= ui.horizon * 12 && a.indexOf(k) === i).map(k => pts[k]);
+  const libJalon = k => k === 0 ? 'Aujourd’hui' : k % 12 === 0 ? `Dans ${k / 12} an${k > 12 ? 's' : ''}` : `Dans ${k} mois`;
+  const obj = state.reglages && state.reglages.objectif;
+  let objectif = '';
+  if (obj && obj.montant) {
+    const atteint = pts.find(p => p.net >= obj.montant);
+    const aLAnnee = pts.filter(p => p.mois.slice(0, 4) === String(obj.annee)).pop();
+    objectif = `<div class="bandeau">${atteint ? `Objectif de ${eur(obj.montant)} atteint en ${moisLong(atteint.mois)} selon cette projection.`
+      : `Objectif de ${eur(obj.montant)} en ${obj.annee} : ${aLAnnee ? `projection à ${eur(aLAnnee.net)} en ${moisLong(aLAnnee.mois)} (${pct(aLAnnee.net / obj.montant * 100)}).` : 'non atteint sur cet horizon.'}`}</div>`;
+  }
+  const finsCredits = state.credits.map(c => ({ c, compte: state.comptes.find(x => x.id === c.compteId), fin: M.finCredit(c), crd: M.crdA(c, M.moisDe(M.dateISO())) }))
+    .filter(x => x.compte && x.compte.actif !== false && x.crd > 0).sort((a, b) => (a.fin || '').localeCompare(b.fin || ''));
+  return `
+    <div class="titre-page"><div><h1>Projection</h1><p>Vue ${esc(filtreLib())} · part de ton patrimoine net d’aujourd’hui</p></div>
+      <div class="segment" role="group" aria-label="Horizon">${[5, 10, 20, 30].map(h => `<button data-action="horizon" data-h="${h}" class="${ui.horizon === h ? 'actif' : ''}">${h} ans</button>`).join('')}</div></div>
+    ${M.aDesHypotheses(state) ? '' : `<div class="bandeau">Aucun rendement ni versement saisi : la courbe reflète uniquement le remboursement de tes crédits. Tu pourras ajouter un taux ou un versement mensuel sur chaque compte (page Comptes).</div>`}
+    ${objectif}
+    <div class="carte"><div class="graph-grand"><canvas id="g-proj"></canvas></div></div>
+    <div class="carte"><h2>Jalons</h2><div class="jalons">${jalons.map(p => `<div class="jalon"><div class="l">${libJalon(p.k)}</div><div class="v num">${eur(p.net)}</div><div class="s">${moisFr(p.mois)} · crédits −${eur(p.dettes)}</div></div>`).join('')}</div></div>
+    ${finsCredits.length ? `<div class="carte"><h2>Fin des crédits</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Crédit</th><th class="d">Restant dû</th><th class="d">Fin</th></tr></thead><tbody>
+      ${finsCredits.map(x => `<tr><td><div class="nom-compte">${esc(x.c.nom)}</div><div class="sous">${esc(x.compte.nom)}</div></td><td class="d num">${eur(x.crd)}</td><td class="d">${x.fin ? moisLong(x.fin) : '—'}</td></tr>`).join('')}
+    </tbody></table></div></div>` : ''}`;
+}
+function graphProjection() {
+  const el = $('#g-proj');
+  if (!el || typeof Chart === 'undefined') return;
+  const pts = M.projection(state, ui.filtre, ui.horizon * 12);
+  const hist = M.historique(state, ui.filtre);
+  const parMois = serieMensuelle(hist);
+  const mDebut = hist.length ? M.moisDe(hist[0].snapshot.date) : pts[0].mois;
+  const mFin = pts[pts.length - 1].mois;
+  const mois = Array.from({ length: M.ecartMois(mDebut, mFin) + 1 }, (_, i) => M.ajouterMois(mDebut, i));
+  const parMoisProj = new Map(pts.map(p => [p.mois, p]));
+  const acc = css('--accent'), proj = css('--cat-immobilier');
+  const opts = optionsGraph({ legende: true });
+  opts.scales.x.ticks.maxTicksLimit = 10;
+  opts.elements = { point: { radius: 0, hoverRadius: 4 } };
+  charts.proj = new Chart(el, {
+    type: 'line',
+    data: { labels: mois.map(moisFr), datasets: [
+      { label: 'Historique', data: mois.map(m => parMois.has(m) ? parMois.get(m).net : null), spanGaps: true, borderColor: acc, backgroundColor: acc, borderWidth: 2.5, pointRadius: mois.map(m => parMois.has(m) ? 3 : 0), tension: .2 },
+      { label: 'Projection', data: mois.map(m => parMoisProj.has(m) ? parMoisProj.get(m).net : null), borderColor: proj, backgroundColor: proj, borderDash: [6, 4], borderWidth: 2, tension: .1 },
+    ] },
+    options: opts,
+  });
+}
+
+// ── Comptes ───────────────────────────────────────────────────────────
+function pageComptes() {
+  const s = M.situation(state, ui.filtre);
+  const parId = new Map(s.lignes.map(l => [l.compte.id, l]));
+  const actifs = M.comptesActifs(state);
+  const archives = state.comptes.filter(c => c.actif === false).sort(M.parOrdre);
+  const avecPart = ui.filtre !== 'foyer';
+  const hyp = c => [c.taux ? `${String(c.taux).replace('.', ',')} %/an` : '', c.versement ? `+${eur(c.versement)}/mois` : ''].filter(Boolean).join(' · ');
+  const cols = `<colgroup><col style="width:${avecPart ? 28 : 32}%"><col class="cache-mobile" style="width:16%"><col style="width:14%"><col class="cache-mobile" style="width:14%"><col style="width:14%">${avecPart ? '<col style="width:12%">' : ''}<col style="width:10%"></colgroup>`;
+  const tableau = liste => `<div class="tab-scroll"><table class="tab tab-comptes">${cols}<thead><tr><th>Compte</th><th class="cache-mobile">Type</th><th class="d">Valeur</th><th class="d cache-mobile">Crédits</th><th class="d">Net</th>${avecPart ? `<th class="d">Part ${esc(filtreLib())}</th>` : ''}<th></th></tr></thead><tbody>
+    ${liste.map(c => { const l = parId.get(c.id); return `<tr class="${avecPart && !l.part ? 'estompe' : ''}">
+      <td><div class="nom-compte">${esc(c.nom)}</div><div class="sous">${[c.groupe, hyp(c)].filter(Boolean).map(esc).join(' · ')}</div></td>
+      <td class="cache-mobile text2">${esc(typeLib(c.type))}</td>
+      <td class="d num">${eur(l.brut, 2)}</td>
+      <td class="d num cache-mobile ${l.dettes ? 'neg' : 'muted'}">${l.dettes ? '−' + eur(l.dettes, 2) : '—'}</td>
+      <td class="d num">${eur(l.net, 2)}</td>
+      ${avecPart ? `<td class="d num">${l.part ? eur(l.net * l.part, 2) : '—'}</td>` : ''}
+      <td class="d"><button class="btn btn-petit" data-action="compte-modifier" data-id="${esc(c.id)}">Modifier</button></td></tr>`; }).join('')}
+    </tbody><tfoot><tr><td>Total</td><td class="cache-mobile"></td><td class="d num">${eur(liste.reduce((t, c) => t + parId.get(c.id).brut, 0))}</td>
+      <td class="d num cache-mobile">${(() => { const d = liste.reduce((t, c) => t + parId.get(c.id).dettes, 0); return d ? '−' + eur(d) : ''; })()}</td>
+      <td class="d num">${eur(liste.reduce((t, c) => t + parId.get(c.id).net, 0))}</td>
+      ${avecPart ? `<td class="d num">${eur(liste.reduce((t, c) => t + parId.get(c.id).net * parId.get(c.id).part, 0))}</td>` : ''}<td></td></tr></tfoot></table></div>`;
+  const sections = ['couple', 'clement', 'alexandre'].map(p => [p, actifs.filter(c => c.proprietaire === p)]).filter(([, l]) => l.length)
+    .map(([p, l]) => `<div class="section-titre"><span>${esc(M.PROPRIETAIRES[p])}${p === 'couple' ? ' · partagé 50/50' : ''}</span></div><div class="carte">${tableau(l)}</div>`).join('');
+  return `
+    <div class="titre-page"><div><h1>Comptes</h1><p>${actifs.length} comptes actifs · patrimoine net ${esc(filtreLib())} : <span class="num">${eur(s.net)}</span></p></div>
+      <button class="btn btn-primaire" data-action="compte-ajouter">+ Ajouter un compte</button></div>
+    ${actifs.length ? sections : vueVide()}
+    ${archives.length ? `<details class="archives"><summary>${archives.length} compte${archives.length > 1 ? 's' : ''} archivé${archives.length > 1 ? 's' : ''} (conservé${archives.length > 1 ? 's' : ''} dans l’historique)</summary>
+      <div class="carte" style="margin-top:10px">${archives.map(c => `<div class="credit-ligne"><div class="infos"><div class="nom-compte">${esc(c.nom)}</div><div class="sous">${esc(typeLib(c.type))} · ${esc(M.PROPRIETAIRES[c.proprietaire])}</div></div>
+        <button class="btn btn-petit" data-action="compte-reactiver" data-id="${esc(c.id)}">Réactiver</button></div>`).join('')}</div></details>` : ''}`;
+}
+
+function ouvrirCompte(id) {
+  const c = id ? state.comptes.find(x => x.id === id) : null;
+  const groupes = [...new Set(state.comptes.map(x => x.groupe).filter(Boolean))];
+  const dlg = $('#dialogue');
+  const opt = (obj, val) => Object.entries(obj).map(([k, v]) => `<option value="${k}" ${k === val ? 'selected' : ''}>${esc(typeof v === 'string' ? v : v.label)}</option>`).join('');
+  dlg.innerHTML = `<form method="dialog" id="f-compte">
+    <div class="dlg-tete">${c ? 'Modifier le compte' : 'Nouveau compte'}</div>
+    <div class="dlg-corps">
+      <div class="champs">
+        <div class="champ large"><label for="fc-nom">Nom</label><input id="fc-nom" required maxlength="80" value="${esc(c ? c.nom : '')}" placeholder="Ex : Assurance-vie Linxea"></div>
+        <div class="champ"><label for="fc-type">Type</label><select id="fc-type">${opt(M.TYPES, c ? c.type : 'livret')}</select></div>
+        <div class="champ"><label for="fc-prop">Propriétaire</label><select id="fc-prop">${opt({ clement: 'Clément', alexandre: 'Alexandre', couple: 'Couple (50/50)' }, c ? c.proprietaire : 'clement')}</select></div>
+        <div class="champ"><label for="fc-valeur" id="fc-valeur-lib">Valeur actuelle (€)</label><input id="fc-valeur" inputmode="decimal" required value="${esc(c ? saisie(c.valeur) : '')}"></div>
+        <div class="champ"><label for="fc-groupe">Groupe (facultatif)</label><input id="fc-groupe" list="fc-groupes" maxlength="60" value="${esc(c ? c.groupe || '' : '')}" placeholder="Ex : SCI des Prêles"><datalist id="fc-groupes">${groupes.map(g => `<option value="${esc(g)}">`).join('')}</datalist></div>
+      </div>
+      <div class="sep"></div>
+      <div class="sous-titre">Hypothèses de projection <span class="muted" style="font-weight:400">(facultatif)</span></div>
+      <div class="champs">
+        <div class="champ"><label for="fc-taux">Rendement annuel (%)</label><input id="fc-taux" inputmode="decimal" value="${esc(c && c.taux != null ? saisie(c.taux) : '')}" placeholder="vide = 0"></div>
+        <div class="champ"><label for="fc-versement">Versement mensuel (€)</label><input id="fc-versement" inputmode="decimal" value="${esc(c && c.versement != null ? saisie(c.versement) : '')}" placeholder="vide = 0"></div>
+      </div>
+      <div id="fc-credits"></div>
+    </div>
+    <div class="dlg-pied">
+      ${c ? `<div class="gauche"><button type="button" class="btn btn-danger" data-action="compte-retirer">${state.snapshots.some(s => c.id in (s.valeurs || {})) ? 'Archiver' : 'Supprimer'}</button></div>` : ''}
+      <button type="button" class="btn" data-action="fermer">Annuler</button>
+      <button type="submit" class="btn btn-primaire">Enregistrer</button>
+    </div></form>`;
+  dlg.dataset.compte = c ? c.id : '';
+  const majType = () => {
+    const immo = $('#fc-type').value === 'immobilier';
+    $('#fc-valeur-lib').textContent = immo ? 'Valeur du bien (€)' : 'Valeur actuelle (€)';
+    $('#fc-credits').innerHTML = immo ? blocCredits(c) : '';
+  };
+  $('#fc-type').onchange = majType; majType();
+  $('#f-compte').onsubmit = e => { e.preventDefault(); sauverCompte(c); };
+  dlg.showModal();
+}
+function blocCredits(c) {
+  if (!c) return `<div class="sep"></div><p class="sous">Enregistre d’abord le compte, puis rouvre-le pour rattacher ses crédits.</p>`;
+  const mois = M.moisDe(M.dateISO());
+  const liste = creditsDe(c.id).map(cr => `<div class="credit-ligne"><div class="infos"><div class="nom-compte">${esc(cr.nom)}</div>
+    <div class="sous">Restant dû : <span class="num">${eur(M.crdA(cr, mois), 2)}</span> · fin ${M.finCredit(cr) ? moisLong(M.finCredit(cr)) : '—'} · ${cr.echeancier.length} échéances</div></div>
+    <button type="button" class="btn btn-petit" data-action="credit-renommer" data-id="${esc(cr.id)}">Renommer</button>
+    <button type="button" class="btn btn-petit btn-danger" data-action="credit-supprimer" data-id="${esc(cr.id)}">Retirer</button></div>`).join('');
+  return `<div class="sep"></div><div class="sous-titre">Crédits rattachés</div>${liste || '<p class="sous" style="margin-bottom:8px">Aucun crédit.</p>'}
+    <div id="credit-ajout"><button type="button" class="btn btn-petit" data-action="credit-ajouter">+ Ajouter un crédit</button></div>`;
+}
+function formulaireCredit() {
+  $('#credit-ajout').innerHTML = `<div class="boite">
+    <div class="champ" style="margin-bottom:8px"><label for="cr-nom">Nom du crédit</label><input id="cr-nom" maxlength="60" placeholder="Ex : Prêt principal"></div>
+    <div class="radios"><label><input type="radio" name="cr-mode" value="fichier" checked> Tableau d’amortissement (Excel / CSV)</label><label><input type="radio" name="cr-mode" value="simple"> Saisie simple</label></div>
+    <div id="cr-fichier"><input type="file" id="cr-file" accept=".xlsx,.xls,.csv"><p class="sous" style="margin-top:6px">Il faut une colonne de dates et une colonne « capital restant dû ».</p></div>
+    <div id="cr-simple" hidden><div class="champs">
+      <div class="champ"><label for="cr-crd">Restant dû ce mois-ci (€)</label><input id="cr-crd" inputmode="decimal"></div>
+      <div class="champ"><label for="cr-mens">Mensualité hors assurance (€)</label><input id="cr-mens" inputmode="decimal"></div>
+      <div class="champ"><label for="cr-taux">Taux annuel (%)</label><input id="cr-taux" inputmode="decimal" placeholder="Ex : 1,35"></div></div></div>
+    <p class="sous" id="cr-apercu" style="margin-top:8px"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button type="button" class="btn btn-petit" data-action="credit-annuler">Annuler</button><button type="button" class="btn btn-petit btn-primaire" data-action="credit-valider" disabled id="cr-valider">Ajouter le crédit</button></div>
+  </div>`;
+  let resultat = null;
+  const apercu = () => {
+    const mode = $('input[name="cr-mode"]:checked').value;
+    $('#cr-fichier').hidden = mode !== 'fichier'; $('#cr-simple').hidden = mode !== 'simple';
+    if (mode === 'simple') {
+      try {
+        resultat = M.genererEcheancier(M.lireNombre($('#cr-crd').value), M.lireNombre($('#cr-taux').value) || 0, M.lireNombre($('#cr-mens').value), M.moisDe(M.dateISO()));
+        $('#cr-apercu').textContent = `${resultat.echeancier.length} échéances · fin ${moisLong(M.finCredit(resultat))}`;
+      } catch (e) { resultat = null; $('#cr-apercu').textContent = ($('#cr-crd').value || $('#cr-mens').value) ? e.message : ''; }
+    }
+    $('#cr-valider').disabled = !resultat;
+    $('#cr-valider')._resultat = resultat;
+  };
+  $$('input[name="cr-mode"]').forEach(r => r.onchange = () => { resultat = null; $('#cr-apercu').textContent = ''; apercu(); });
+  ['#cr-crd', '#cr-mens', '#cr-taux'].forEach(s => $(s).oninput = apercu);
+  $('#cr-file').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    $('#cr-apercu').textContent = 'Lecture du fichier…';
+    try {
+      await chargerSheetJS();
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+      const lignes = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+      resultat = M.parserTableauAmortissement(lignes);
+      const mois = M.moisDe(M.dateISO());
+      $('#cr-apercu').textContent = `${resultat.echeancier.length} échéances lues (${moisFr(resultat.echeancier[0].m)} → ${moisFr(resultat.echeancier.at(-1).m)}) · restant dû ce mois : ${eur(M.crdA(resultat, mois), 2)}`;
+      if (!$('#cr-nom').value) $('#cr-nom').value = f.name.replace(/\.[^.]+$/, '');
+    } catch (err) { resultat = null; $('#cr-apercu').textContent = '✗ ' + err.message; }
+    $('#cr-valider').disabled = !resultat;
+    $('#cr-valider')._resultat = resultat;
+  };
+}
+let promesseSheetJS = null;
+function chargerSheetJS() {
+  if (window.XLSX) return Promise.resolve();
+  return promesseSheetJS ||= new Promise((ok, ko) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.onload = ok; s.onerror = () => { promesseSheetJS = null; ko(new Error('Impossible de charger le lecteur Excel (connexion ?).')); };
+    document.head.appendChild(s);
+  });
+}
+function sauverCompte(c) {
+  const nom = $('#fc-nom').value.trim();
+  const valeur = M.lireNombre($('#fc-valeur').value);
+  const taux = $('#fc-taux').value.trim() ? M.lireNombre($('#fc-taux').value) : null;
+  const versement = $('#fc-versement').value.trim() ? M.lireNombre($('#fc-versement').value) : null;
+  if (!nom) return toast('Le nom est obligatoire.', 'erreur');
+  if (valeur == null) return toast('Valeur invalide.', 'erreur');
+  if ($('#fc-taux').value.trim() && taux == null) return toast('Rendement invalide.', 'erreur');
+  if ($('#fc-versement').value.trim() && versement == null) return toast('Versement invalide.', 'erreur');
+  const ordreMax = Math.max(-1, ...state.comptes.map(x => x.ordre ?? 0));
+  const compte = Object.assign({ actif: true, ordre: ordreMax + 1 }, c || {}, {
+    id: c ? c.id : nouvelId(), nom, type: $('#fc-type').value, proprietaire: $('#fc-prop').value,
+    groupe: $('#fc-groupe').value.trim(), valeur: M.r2(valeur), taux, versement,
+  });
+  ecrire(store.enregistrerCompte(compte)).catch(() => {});
+  $('#dialogue').close();
+  toast(c ? 'Compte modifié.' : 'Compte ajouté.');
+}
+
+// ── Réglages ──────────────────────────────────────────────────────────
+function pageReglages() {
+  const obj = (state.reglages && state.reglages.objectif) || {};
+  return `
+    <div class="titre-page"><div><h1>Réglages</h1><p>Apogée ${VERSION_APP} · ${store.mode === 'local' ? 'mode local (ce navigateur)' : 'synchronisé avec Firebase'}</p></div></div>
+    ${store.mode === 'local' ? `<div class="bandeau warn">Firebase n’est pas encore configuré : tes données sont enregistrées dans ce navigateur uniquement. Pense à exporter une sauvegarde.</div>` : ''}
+    <div class="grille g-3">
+      <div class="carte"><h2>Objectif</h2>
+        <div class="champs" style="grid-template-columns:1fr 1fr">
+          <div class="champ"><label for="obj-montant">Montant (€)</label><input id="obj-montant" inputmode="decimal" value="${esc(saisie(obj.montant))}"></div>
+          <div class="champ"><label for="obj-annee">Année</label><input id="obj-annee" inputmode="numeric" maxlength="4" value="${esc(obj.annee || '')}"></div>
+        </div>
+        <div style="margin-top:12px;display:flex;justify-content:flex-end"><button class="btn btn-primaire btn-petit" data-action="objectif-sauver">Enregistrer</button></div>
+      </div>
+      <div class="carte"><h2>Sauvegarde</h2>
+        <p class="sous" style="margin-bottom:12px">${state.comptes.length} comptes · ${state.credits.length} crédits · ${state.snapshots.length} snapshots</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-action="exporter">Exporter (JSON)</button><button class="btn" data-action="importer">Importer…</button></div>
+        <p class="sous" style="margin-top:10px">L’import remplace toutes les données actuelles.</p>
+      </div>
+      <div class="carte"><h2>Session</h2>
+        <p class="sous" style="margin-bottom:12px">${store.mode === 'local' ? 'Aucune connexion (mode local).' : 'Connecté : ' + esc(store.email || '')}</p>
+        ${store.mode === 'local' ? '' : '<button class="btn" data-action="deconnexion">Se déconnecter</button>'}
+      </div>
+    </div>`;
+}
+
+// ── Import / export ───────────────────────────────────────────────────
+function exporterFichier() {
+  const blob = new Blob([JSON.stringify(M.exporter(state), null, 1)], { type: 'application/json' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `apogee-v2-${M.dateISO()}.json` });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function importerFichier() {
+  const inp = Object.assign(document.createElement('input'), { type: 'file', accept: '.json,application/json' });
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    let d;
+    try { d = M.validerDonnees(JSON.parse(await f.text())); }
+    catch (e) { return toast('Import impossible : ' + e.message, 'erreur'); }
+    const net = d.snapshots.length ? M.historique(d, 'foyer').pop() : null;
+    const msg = `Le fichier contient <strong>${d.comptes.length} comptes</strong>, ${d.credits.length} crédits et <strong>${d.snapshots.length} snapshots</strong>${net ? ` (dernier : ${esc(dateFr(net.snapshot.date))}, net ${esc(eur(net.net))})` : ''}.`
+      + (state.comptes.length || state.snapshots.length ? `<br><br>Toutes les données actuelles (${state.comptes.length} comptes, ${state.snapshots.length} snapshots) seront remplacées.` : '');
+    if (!await confirmer('Importer cette sauvegarde ?', msg, 'Importer', state.comptes.length > 0)) return;
+    ecrire(store.remplacerTout(d)).then(() => toast('Import terminé.'), () => {});
+    location.hash = '#/tableau';
+  };
+  inp.click();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// RENDU & ÉVÉNEMENTS
+// ══════════════════════════════════════════════════════════════════════
+const PAGES = { tableau: pageTableau, maj: pageMaj, historique: pageHistorique, projection: pageProjection, comptes: pageComptes, reglages: pageReglages };
+const GRAPHS = { tableau: graphTableau, historique: graphHistorique, projection: graphProjection };
+
+function rendre() {
+  if (!state) return;
+  const page = $('#page');
+  const scroll = window.scrollY;
+  detruireGraphs();
+  page.innerHTML = PAGES[ui.page]();
+  $$('#nav a, .btn-icone[data-page]').forEach(a => a.classList.toggle('actif', a.dataset.page === ui.page));
+  $$('#filtre button').forEach(b => b.classList.toggle('actif', b.dataset.filtre === ui.filtre));
+  $('#filtre').hidden = ['maj', 'reglages'].includes(ui.page);
+  try { GRAPHS[ui.page] && GRAPHS[ui.page](); } catch (e) { console.error(e); }
+  if (ui.page === 'maj') rafraichirMaj();
+  window.scrollTo(0, scroll);
+}
+function route() {
+  const p = (location.hash.match(/^#\/(\w+)/) || [])[1];
+  const nouvelle = PAGES[p] ? p : 'tableau';
+  if (nouvelle !== ui.page) window.scrollTo(0, 0);
+  ui.page = nouvelle;
+  rendre();
+}
+addEventListener('hashchange', route);
+
+const actions = {
+  'importer': importerFichier,
+  'exporter': exporterFichier,
+  'deconnexion': () => store.deconnecter && store.deconnecter(),
+  'horizon': el => { ui.horizon = +el.dataset.h; setPref('horizon', ui.horizon); rendre(); },
+  'maj-annuler': async () => { if (await confirmer('Abandonner la mise à jour ?', 'Les montants saisis seront perdus.', 'Abandonner', true)) { ui.maj = null; location.hash = '#/tableau'; } },
+  'maj-enregistrer': enregistrerMaj,
+  'hist-select': el => { ui.histSel = el.dataset.date; ui.histEdition = false; rendre(); },
+  'hist-modifier': () => { ui.histEdition = true; rendre(); },
+  'hist-annuler': () => { ui.histEdition = false; rendre(); },
+  'hist-sauver': () => {
+    const snap = state.snapshots.find(s => s.date === ui.histSel); if (!snap) return;
+    const valeurs = {};
+    for (const inp of $$('[data-edit]')) { const v = M.lireNombre(inp.value); if (v == null) return toast('Montant invalide.', 'erreur'); valeurs[inp.dataset.edit] = M.r2(v); }
+    const plusRecent = !state.snapshots.some(s => s.date > snap.date);
+    const majComptes = plusRecent ? state.comptes.filter(c => c.actif !== false && c.id in valeurs && M.r2(c.valeur) !== valeurs[c.id]).map(c => Object.assign({}, c, { valeur: valeurs[c.id] })) : [];
+    ecrire(store.enregistrerSnapshot(Object.assign({}, snap, { valeurs, modifieLe: new Date().toISOString() }), majComptes)).catch(() => {});
+    ui.histEdition = false; toast('Snapshot modifié.'); rendre();
+  },
+  'hist-supprimer': async () => {
+    if (!await confirmer('Supprimer ce snapshot ?', `Le point du ${esc(dateFr(ui.histSel))} sera retiré de l’historique.`, 'Supprimer', true)) return;
+    ecrire(store.supprimerSnapshot(ui.histSel)).catch(() => {}); ui.histSel = null; toast('Snapshot supprimé.');
+  },
+  'compte-ajouter': () => ouvrirCompte(null),
+  'compte-modifier': el => ouvrirCompte(el.dataset.id),
+  'compte-reactiver': el => { const c = state.comptes.find(x => x.id === el.dataset.id); ecrire(store.enregistrerCompte(Object.assign({}, c, { actif: true }))).catch(() => {}); },
+  'compte-retirer': async () => {
+    const c = state.comptes.find(x => x.id === $('#dialogue').dataset.compte); if (!c) return;
+    const dansHistorique = state.snapshots.some(s => c.id in (s.valeurs || {}));
+    $('#dialogue').close();
+    if (dansHistorique) {
+      if (!await confirmer('Archiver ce compte ?', `« ${esc(c.nom)} » n’apparaîtra plus dans la mise à jour ni dans le patrimoine actuel, mais restera dans l’historique. Tu pourras le réactiver.`, 'Archiver')) return;
+      ecrire(store.enregistrerCompte(Object.assign({}, c, { actif: false }))).catch(() => {});
+    } else {
+      if (!await confirmer('Supprimer ce compte ?', `« ${esc(c.nom)} » et ses crédits seront supprimés définitivement.`, 'Supprimer', true)) return;
+      ecrire(store.supprimerCompte(c.id)).catch(() => {});
+    }
+  },
+  'fermer': () => $('#dialogue').close(),
+  'credit-ajouter': formulaireCredit,
+  'credit-annuler': () => { $('#credit-ajout').innerHTML = '<button type="button" class="btn btn-petit" data-action="credit-ajouter">+ Ajouter un crédit</button>'; },
+  'credit-valider': el => {
+    const r = el._resultat, compteId = $('#dialogue').dataset.compte;
+    const nom = $('#cr-nom').value.trim() || 'Crédit';
+    if (!r || !compteId) return;
+    ecrire(store.enregistrerCredit({ id: nouvelId(), compteId, nom, crdInitial: r.crdInitial, echeancier: r.echeancier })).catch(() => {});
+    toast('Crédit ajouté.');
+  },
+  'credit-renommer': el => {
+    const cr = state.credits.find(x => x.id === el.dataset.id); if (!cr) return;
+    const ligne = el.closest('.credit-ligne');
+    ligne.innerHTML = `<div class="infos"><input class="champ" style="width:100%;border:1px solid var(--border2);border-radius:8px;padding:6px 8px" id="cr-renom" value="${esc(cr.nom)}" maxlength="60"></div>
+      <button type="button" class="btn btn-petit btn-primaire" data-action="credit-renommer-ok" data-id="${esc(cr.id)}">OK</button>`;
+    $('#cr-renom').focus();
+  },
+  'credit-renommer-ok': el => {
+    const cr = state.credits.find(x => x.id === el.dataset.id), nom = $('#cr-renom').value.trim();
+    if (cr && nom) ecrire(store.enregistrerCredit(Object.assign({}, cr, { nom }))).catch(() => {});
+  },
+  'credit-supprimer': async el => {
+    const cr = state.credits.find(x => x.id === el.dataset.id); if (!cr) return;
+    const dlg = $('#dialogue'); dlg.close();
+    const ok = await confirmer('Retirer ce crédit ?', `« ${esc(cr.nom)} » ne sera plus déduit du patrimoine actuel ni de la projection. Les snapshots déjà enregistrés ne changent pas.`, 'Retirer', true);
+    if (ok) ecrire(store.supprimerCredit(cr.id)).catch(() => {});
+    ouvrirCompte(cr.compteId);
+  },
+  'objectif-sauver': () => {
+    const montant = M.lireNombre($('#obj-montant').value), annee = parseInt($('#obj-annee').value, 10);
+    const vide = !$('#obj-montant').value.trim();
+    if (!vide && (montant == null || montant <= 0 || !(annee >= 2000 && annee < 2200))) return toast('Objectif invalide.', 'erreur');
+    ecrire(store.enregistrerReglages(Object.assign({}, state.reglages, { objectif: vide ? null : { montant, annee } }))).catch(() => {});
+    toast(vide ? 'Objectif retiré.' : 'Objectif enregistré.');
+  },
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (el && actions[el.dataset.action]) { e.preventDefault(); actions[el.dataset.action](el, e); return; }
+  const f = e.target.closest('#filtre button');
+  if (f) { ui.filtre = f.dataset.filtre; setPref('filtre', ui.filtre); rendre(); }
+});
+document.addEventListener('input', e => {
+  const id = e.target.dataset && e.target.dataset.maj;
+  if (id && ui.maj) { ui.maj.valeurs[id] = e.target.value; rafraichirMaj(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'maj-date' && ui.maj) { ui.maj.date = e.target.value || M.dateISO(); rendre(); }
+});
+
+// Nouvelles données (chargement, autre appareil, écriture locale)
+function surDonnees(d) {
+  state = d;
+  const dlgCompte = $('#dialogue');
+  if (dlgCompte.open && dlgCompte.dataset.compte && $('#fc-credits')) {
+    // Rafraîchit la liste des crédits du compte ouvert sans fermer le formulaire
+    const c = state.comptes.find(x => x.id === dlgCompte.dataset.compte);
+    if (c && $('#fc-type').value === 'immobilier' && !$('#credit-ajout .boite')) $('#fc-credits').innerHTML = blocCredits(c);
+    else if (c && $('#credit-ajout .boite') && creditsDe(c.id).length !== $$('#fc-credits .credit-ligne').length) $('#fc-credits').innerHTML = blocCredits(c);
+  }
+  if (ui.page === 'maj' && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.maj) { rafraichirMaj(); return; }
+  rendre();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// DÉMARRAGE
+// ══════════════════════════════════════════════════════════════════════
+function afficherApp() { $('#ecran-connexion').hidden = true; $('#app').hidden = false; route(); }
+function afficherConnexion(erreur) {
+  $('#app').hidden = true; $('#ecran-connexion').hidden = false;
+  const p = $('#connexion-erreur'); p.hidden = !erreur; p.textContent = erreur || '';
+}
+
+async function demarrer() {
+  const forcerLocal = new URLSearchParams(location.search).get('mode') === 'local';
+  if (!FIREBASE_CONFIG.apiKey || forcerLocal) {
+    store = creerStoreLocal(surDonnees);
+    afficherApp();
+    store.demarrer();
+    return;
+  }
+  let fb;
+  try {
+    const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/`;
+    const [app, auth, fs] = await Promise.all([import(base + 'firebase-app.js'), import(base + 'firebase-auth.js'), import(base + 'firebase-firestore.js')]);
+    fb = { app, auth, fs };
+  } catch (e) {
+    return afficherConnexion('Impossible de charger Firebase. Vérifie ta connexion puis recharge la page.');
+  }
+  const app = fb.app.initializeApp(FIREBASE_CONFIG);
+  const auth = fb.auth.getAuth(app);
+  let db;
+  try { db = fb.fs.initializeFirestore(app, { localCache: fb.fs.persistentLocalCache({ tabManager: fb.fs.persistentMultipleTabManager() }) }); }
+  catch { db = fb.fs.getFirestore(app); }
+  const fournisseur = new fb.auth.GoogleAuthProvider();
+  fournisseur.setCustomParameters({ prompt: 'select_account' });
+  $('#btn-google').onclick = async () => {
+    try { await fb.auth.signInWithPopup(auth, fournisseur); }
+    catch (e) {
+      if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(e.code)) return fb.auth.signInWithRedirect(auth, fournisseur);
+      if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') afficherConnexion('Connexion impossible : ' + (e.message || e.code));
+    }
+  };
+  fb.auth.onAuthStateChanged(auth, async user => {
+    if (store) { store.arreter(); store = null; state = null; }
+    if (!user) return afficherConnexion();
+    if (EMAIL_AUTORISE && (user.email || '').toLowerCase() !== EMAIL_AUTORISE.toLowerCase()) {
+      await fb.auth.signOut(auth);
+      return afficherConnexion(`Le compte ${user.email} n’est pas autorisé.`);
+    }
+    $('#page').innerHTML = '<div class="chargement">Chargement…</div>';
+    afficherApp();
+    store = await creerStoreFirebase(db, fb.fs, user.uid, surDonnees);
+    store.email = user.email;
+    store.deconnecter = () => fb.auth.signOut(auth);
+    statut({ etat: 'attente' });
+  });
+}
+demarrer();
+</script>
+</body>
+</html>
