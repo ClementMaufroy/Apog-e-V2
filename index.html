@@ -967,7 +967,8 @@ function optionsGraph({ min, legende = false } = {}) {
   const grille = css('--border'), texte = css('--text3');
   return {
     responsive: true, maintainAspectRatio: false, animation: false,
-    interaction: { mode: 'index', intersect: false },
+    interaction: { mode: 'nearest', intersect: true },
+    elements: { point: { hitRadius: 8 } },
     plugins: {
       legend: { display: legende, labels: { color: css('--text2'), boxWidth: 18, boxHeight: 2 } },
       tooltip: { filter: i => i.parsed.y != null, callbacks: { label: c => ` ${c.dataset.label} : ${eur(c.parsed.y)}` } },
@@ -1376,7 +1377,7 @@ function graphProjection() {
   const acc = css('--accent');
   const opts = activerZoom(optionsGraph({ legende: true }), 'zoom-proj');
   opts.scales.x.ticks.maxTicksLimit = innerWidth < 640 ? 4 : 10;
-  opts.elements = { point: { radius: 0, hoverRadius: 4 } };
+  opts.elements = { point: { radius: 0, hoverRadius: 5, hitRadius: 5 } };
   opts.plugins.tooltip.callbacks.label = etiquetteAvecEcart(traj, mois);
   opts.plugins.tooltip.callbacks.title = items => moisLong(mois[items[0].dataIndex]);
   const datasets = [
