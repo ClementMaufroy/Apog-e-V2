@@ -597,24 +597,26 @@ function projection(state, filtre, horizonMois, iso = dateISO()) {
 
 // ── Hypothèses de placement (comme la V1) ──
 // { id, nom, debut: 'AAAA-MM', montantInitial, versementMensuel, versementAnnuel, rendement (%/an), duree (ans | null), visible }
-// Capitalisation mensuelle au taux r/12 ; versement annuel en fin de chaque année ;
+// Rendement annuel effectif : 100 € placés à 6 % valent 106 € au bout de 12 mois (1,06^n).
+// Un versement fait en cours d'année rapporte au prorata, au taux mensuel équivalent (1,06^(1/12) − 1) ;
+// versement annuel en fin de chaque année ;
 // après la durée, plus de versement mais le capital continue de rapporter.
 function gainHypothese(h, mois) {
   const t = ecartMois(h.debut, mois); // mois écoulés depuis le début
   if (t <= 0) return 0;
-  const rm = (+h.rendement || 0) / 100 / 12;
+  const rm = Math.pow(1 + (+h.rendement || 0) / 100, 1 / 12) - 1; // équivalent mensuel exact du taux annuel
   const v0 = +h.montantInitial || 0, vm = +h.versementMensuel || 0, va = +h.versementAnnuel || 0;
   const dureeMois = h.duree ? Math.round(+h.duree * 12) : null;
   const actif = dureeMois ? Math.min(t, dureeMois) : t;
   let c;
-  if (rm > 0) {
+  if (Math.abs(rm) > 1e-12) {
     const f = Math.pow(1 + rm, actif);
     c = v0 * f + vm * (f - 1) / rm;
     const n = Math.floor(actif / 12);
     if (va > 0 && n > 0) { const fa = Math.pow(1 + rm, 12); c += va * Math.pow(1 + rm, actif - 12 * n) * (Math.pow(fa, n) - 1) / (fa - 1); }
   } else c = v0 + vm * actif + va * Math.floor(actif / 12);
   const apres = dureeMois ? Math.max(0, t - dureeMois) : 0;
-  if (apres > 0 && rm > 0) c *= Math.pow(1 + rm, apres);
+  if (apres > 0) c *= Math.pow(1 + rm, apres);
   return r2(c);
 }
 // Total versé (sans les intérêts) à un mois donné : capital initial + mensualités + versements annuels.
@@ -1352,7 +1354,7 @@ function pageProjection() {
     <div class="carte"><div class="carte-titre"><h2>Hypothèses de placement</h2><button class="btn btn-petit btn-primaire" data-action="hyp-ajouter">+ Nouvelle hypothèse</button></div>
       ${hyps.length ? `<div class="tab-scroll"><table class="tab"><thead><tr><th>Nom</th><th>Début</th><th class="d">Capital initial</th><th class="d">Versements</th><th class="d">Rendement</th><th class="d">Durée</th><th></th></tr></thead><tbody>${lignesHyp}</tbody></table></div>
         <label class="case-total"><input type="checkbox" data-action="hyp-total" ${(state.reglages || {}).totalHypotheses !== false ? 'checked' : ''}> Afficher la courbe « Total avec hypothèses » (projection de base + toutes les hypothèses)</label>
-        <p class="sous" style="margin-top:10px">La courbe de chaque hypothèse montre seulement l’argent placé et ses intérêts. Intérêts composés chaque mois ; versement mensuel chaque mois et versement annuel une fois par an (à la fin de chaque année) ; après la durée, plus de versement mais le capital continue de rapporter.${ui.filtre !== 'foyer' ? ' En vue individuelle, la moitié est comptée.' : ''}</p>`
+        <p class="sous" style="margin-top:10px">La courbe de chaque hypothèse montre seulement l’argent placé et ses intérêts. Rendement annuel : 100 € placés à 6 % valent 106 € au bout d’un an (1,06 par an, composé d’année en année) ; un versement fait en cours d’année rapporte au prorata. Versement mensuel chaque mois, versement annuel une fois par an (à la fin de chaque année) ; après la durée, plus de versement mais le capital continue de rapporter.${ui.filtre !== 'foyer' ? ' En vue individuelle, la moitié est comptée.' : ''}</p>`
         : '<p class="sous">Aucune hypothèse. Exemple : « ETF World, 500 €/mois à 6 %/an à partir de janvier ». Chaque hypothèse a sa propre courbe, que tu affiches ou non.</p>'}
     </div>
     ${finsCredits.length ? `<div class="carte"><h2>Fin des crédits</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Crédit</th><th class="d">Restant dû</th><th class="d">Fin</th><th></th></tr></thead><tbody>
