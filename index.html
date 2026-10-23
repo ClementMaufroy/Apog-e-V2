@@ -10,6 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
 <style>
 :root{
   --bg:#f4f3ef; --surface:#fff; --surface2:#f8f7f3; --border:#e6e3da; --border2:#d3cfc3;
@@ -160,7 +162,7 @@ table.tab-comptes{table-layout:fixed;min-width:640px}
 .maj-boutons{display:flex;gap:8px}
 
 /* ── Formulaires & dialogues ── */
-dialog{border:0;border-radius:18px;padding:0;background:var(--surface);color:var(--text);box-shadow:0 20px 60px rgba(0,0,0,.25);width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog{margin:auto;border:0;border-radius:18px;padding:0;background:var(--surface);color:var(--text);box-shadow:0 20px 60px rgba(0,0,0,.25);width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
 dialog::backdrop{background:rgba(15,15,10,.45)}
 .dlg-tete{padding:18px 22px 4px;font-size:17px;font-weight:600}
 .dlg-corps{padding:12px 22px;max-height:calc(100vh - 170px);overflow:auto}
@@ -185,23 +187,24 @@ dialog::backdrop{background:rgba(15,15,10,.45)}
 .vide{text-align:center;padding:50px 20px;color:var(--text2)}
 .vide h2{font-size:18px;color:var(--text);margin-bottom:8px}
 .vide p{margin-bottom:18px}
-.g-proj{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);margin:16px 0;align-items:stretch}
+.zoom-barre{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px 0 8px;min-height:28px}
+.ecart-obj{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;background:var(--surface2)}
+.ecart-obj span{color:var(--text2)} .ecart-obj strong{font-size:15px}
+.btn.actif-doux{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.case-total{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;cursor:pointer}
+.case-total input{accent-color:var(--accent)}
+dialog.dlg-large{width:min(720px,calc(100vw - 24px))}
+.tableau-credit{max-height:min(55vh,520px);overflow:auto}
+.tableau-credit thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+.tableau-credit tr.passe td{color:var(--text3)}
+.tableau-credit tr.courant td{background:var(--accent-soft);font-weight:600}
+.g-proj{grid-template-columns:minmax(0,1fr) minmax(0,2fr);margin:16px 0;align-items:stretch}
 .g-proj>.carte{margin:0}
 @media (max-width:900px){.g-proj{grid-template-columns:minmax(0,1fr)}}
 .obj-phrase{font-size:14px;line-height:1.55;color:var(--text2)} .obj-phrase strong{color:var(--text);font-weight:600}
 .carte-titre{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px} .carte-titre h2{margin:0}
 .pastille-serie{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px;flex:none}
 .nom-serie{display:inline-flex;align-items:center;white-space:nowrap}
-.entete-sc{display:inline-flex;align-items:center;gap:5px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--text);font-weight:600;white-space:nowrap}
-.entete-sc input{accent-color:var(--accent);margin:0}
-.tab-sim td{vertical-align:middle}
-.tab-sim .ligne-epargne td{border-top:1px solid var(--border2)}
-.champ-sim{display:inline-flex;align-items:center;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);padding:0 8px;width:96px}
-.champ-sim:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.champ-sim input{border:0;background:none;outline:0;width:100%;padding:6px 0;text-align:right;font-family:var(--mono);font-size:13px;color:var(--text)}
-.champ-sim span{color:var(--text3);margin-left:5px;font-size:12px}
-.champ-sim.off{opacity:.45}
-@media (max-width:640px){.champ-sim{width:78px}}
 .jalons{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 .jalon{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px}
 .jalon .l{font-size:11.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
@@ -302,6 +305,7 @@ details.archives summary{cursor:pointer;color:var(--text2);font-size:13px;margin
 
 <dialog id="dialogue"></dialog>
 <dialog id="confirmation"></dialog>
+<dialog id="dlg-tableau" class="dlg-large"></dialog>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
 <!-- ═══════════════════════════════════════════════════════════════════
@@ -393,13 +397,23 @@ function genererEcheancier(crdActuel, tauxAnnuel, mensualite, moisDepart) {
   const ech = [{ m: moisDepart, crd }];
   let m = moisDepart;
   for (let i = 0; i < 720 && crd > 0; i++) {
-    crd = r2(Math.max(0, crd - (mensualite - crd * tm)));
+    const interets = r2(crd * tm), capital = r2(Math.min(crd, mensualite - interets));
+    crd = r2(Math.max(0, crd - capital));
     m = ajouterMois(m, 1);
-    ech.push({ m, crd });
+    ech.push({ m, crd, capital, interets });
   }
   return { crdInitial: r2(crdActuel), echeancier: ech };
 }
 
+// Lignes à afficher : capital amorti déduit du restant dû quand il n'est pas fourni.
+function detailEcheancier(credit) {
+  let prec = +credit.crdInitial || 0;
+  return (credit.echeancier || []).map((e, i) => {
+    const capital = e.capital != null ? +e.capital : (i === 0 && !credit.crdInitial ? null : r2(prec - e.crd));
+    prec = e.crd;
+    return { m: e.m, crd: e.crd, capital, interets: e.interets != null ? +e.interets : null };
+  });
+}
 // ── Lecture d'un tableau d'amortissement (lignes d'un Excel/CSV) ──
 const MOIS_FR = { janv: 1, janvier: 1, fevr: 2, fev: 2, fevrier: 2, mars: 3, avr: 4, avril: 4, mai: 5, juin: 6, juil: 7, juillet: 7, aout: 8, sept: 9, septembre: 9, oct: 10, octobre: 10, nov: 11, novembre: 11, dec: 12, decembre: 12 };
 const sansAccent = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -430,7 +444,8 @@ function lireMois(v) {
 function parserTableauAmortissement(lignes) {
   const KW_DATE = ['date', 'echeance', 'periode', 'mois'];
   const KW_CRD = ['capital restant', 'restant du', 'crd', 'capital du', 'solde restant', 'encours', 'capital apres'];
-  let entete = -1, colDate = -1, colCrd = -1;
+  const KW_INT = ['interet'], KW_CAP = ['capital amorti', 'amortissement', 'capital rembourse', 'part capital', 'remboursement capital'];
+  let entete = -1, colDate = -1, colCrd = -1, colInt = -1, colCap = -1;
   for (let i = 0; i < Math.min(25, lignes.length) && entete < 0; i++) {
     const cells = (lignes[i] || []).map(c => sansAccent(c == null ? '' : c).trim());
     const cand = [];
@@ -445,6 +460,11 @@ function parserTableauAmortissement(lignes) {
       const pasDebut = cand.filter(([, c]) => !/debut/.test(c));
       colCrd = (fin || pasDebut[pasDebut.length - 1] || cand[cand.length - 1])[0];
       colDate = d; entete = i;
+      cells.forEach((c, j) => {
+        if (!c || j === colCrd || j === colDate) return;
+        if (colInt < 0 && KW_INT.some(k => c.includes(k)) && !/cumul/.test(c)) colInt = j;
+        else if (colCap < 0 && KW_CAP.some(k => c.includes(k)) && !/cumul/.test(c)) colCap = j;
+      });
     }
   }
   if (entete < 0) throw new Error('Colonnes « Date » et « Capital restant dû » introuvables dans le fichier.');
@@ -452,9 +472,15 @@ function parserTableauAmortissement(lignes) {
   for (let i = entete + 1; i < lignes.length; i++) {
     const l = lignes[i] || [];
     const m = lireMois(l[colDate]), crd = lireNombre(l[colCrd]);
-    if (m && crd != null && crd >= 0) parMois.set(m, r2(crd));
+    if (m && crd != null && crd >= 0) {
+      const ligne = { m, crd: r2(crd) };
+      const it = colInt >= 0 ? lireNombre(l[colInt]) : null, ca = colCap >= 0 ? lireNombre(l[colCap]) : null;
+      if (it != null) ligne.interets = r2(it);
+      if (ca != null) ligne.capital = r2(ca);
+      parMois.set(m, ligne);
+    }
   }
-  const ech = [...parMois.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([m, crd]) => ({ m, crd }));
+  const ech = [...parMois.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, l]) => l);
   if (ech.length < 2) throw new Error('Aucune échéance lisible trouvée sous l’en-tête.');
   return { crdInitial: ech[0].crd, echeancier: ech };
 }
@@ -509,31 +535,7 @@ function construireSnapshot(state, date, valeurs) {
 }
 
 // ── Projection ──
-// Scénarios de simulation : rendement annuel par catégorie + épargne mensuelle du couple.
-// Un taux saisi sur un compte (page Comptes) l'emporte sur celui du scénario.
-// Les comptes courants ne rapportent rien, quel que soit le scénario.
-const CATS_SIMULEES = ['liquidites', 'placements', 'salariale', 'crypto', 'obligations', 'immobilier', 'autre'];
-const SCENARIOS_DEFAUT = [
-  { id: 'prudent',   nom: 'Prudent',   actif: true, epargne: 0, taux: { liquidites: 1.5, placements: 3, salariale: 3, crypto: 0,  obligations: 3, immobilier: 0, autre: 0 } },
-  { id: 'central',   nom: 'Central',   actif: true, epargne: 0, taux: { liquidites: 2,   placements: 5, salariale: 5, crypto: 5,  obligations: 5, immobilier: 1, autre: 0 } },
-  { id: 'dynamique', nom: 'Dynamique', actif: true, epargne: 0, taux: { liquidites: 2.5, placements: 7, salariale: 7, crypto: 10, obligations: 7, immobilier: 2, autre: 0 } },
-];
-function scenarios(state) {
-  const enr = (state.reglages && state.reglages.simulation && state.reglages.simulation.scenarios) || [];
-  return SCENARIOS_DEFAUT.map(d => {
-    const e = enr.find(x => x.id === d.id) || {};
-    const taux = {};
-    CATS_SIMULEES.forEach(k => { const v = e.taux && e.taux[k]; taux[k] = v == null || v === '' || isNaN(+v) ? d.taux[k] : +v; });
-    return { id: d.id, nom: d.nom, actif: e.actif == null ? d.actif : !!e.actif, epargne: e.epargne == null || isNaN(+e.epargne) ? d.epargne : +e.epargne, taux };
-  });
-}
-const tauxPropre = c => c.taux != null && c.taux !== '' && !isNaN(+c.taux);
 function aDesHypotheses(state) { return comptesActifs(state).some(c => +c.taux || +c.versement); }
-function tauxCompte(c, sc) {
-  if (tauxPropre(c)) return +c.taux;
-  if (!sc || c.type === 'courant') return 0;
-  return +(sc.taux[(TYPES[c.type] || TYPES.autre).cat] || 0);
-}
 // Valeur future d'un capital v et d'un versement mensuel vm au taux annuel t (%), après k mois.
 function valeurFuture(v, vm, t, k) {
   const r = Math.pow(1 + (+t || 0) / 100, 1 / 12) - 1; // taux mensuel équivalent
@@ -541,43 +543,83 @@ function valeurFuture(v, vm, t, k) {
   const f = Math.pow(1 + r, k);
   return v * f + vm * (f - 1) / r;
 }
-function croissance(c, k, sc) {
-  const v = +c.valeur || 0, t = tauxCompte(c, sc), vm = +c.versement || 0;
+// Taux et versement propres à un compte (anciennes données ; plus saisis dans l'interface).
+function croissance(c, k) {
+  const v = +c.valeur || 0, t = +c.taux || 0, vm = +c.versement || 0;
   if (!t && !vm) return v;
   return valeurFuture(v, vm, t, k);
 }
+// Projection de base : valeurs actuelles figées, seuls les crédits se remboursent.
 // k = 0 correspond exactement à la situation du jour : la courbe part du net réel.
-// sc absent : uniquement le remboursement des crédits (+ taux/versements propres aux comptes).
-function projection(state, filtre, horizonMois, iso = dateISO(), sc = null) {
+function projection(state, filtre, horizonMois, iso = dateISO()) {
   const m0 = moisDe(iso), comptes = comptesActifs(state), pts = [];
-  const epargne = sc ? (+sc.epargne || 0) * (filtre === 'foyer' ? 1 : 0.5) : 0; // épargne du couple, partagée 50/50
   for (let k = 0; k <= horizonMois; k++) {
     const mois = ajouterMois(m0, k);
     let brut = 0, dettes = 0, net = 0;
     for (const c of comptes) {
       const p = part(c.proprietaire, filtre);
       if (!p) continue;
-      const b = croissance(c, k, sc), d = dettesCompte(state.credits, c.id, mois);
+      const b = croissance(c, k), d = dettesCompte(state.credits, c.id, mois);
       brut += b * p; dettes += d * p; net += r2(b - d) * p; // même calcul que situation()
     }
-    if (epargne) { const e = valeurFuture(0, epargne, sc.taux.placements, k); brut += e; net += e; }
     pts.push({ mois, k, brut: r2(brut), dettes: r2(dettes), net: r2(net) });
   }
   return pts;
 }
-// Trajectoire régulière (croissance constante) entre le net du jour et l'objectif, atteint en décembre de l'année visée.
-function trajectoireObjectif(net0, m0, montant, annee) {
-  const mFin = `${annee}-12`, n = ecartMois(m0, mFin);
-  if (!(montant > 0) || n <= 0) return null;
-  let tauxAnnuel = null, valeur;
-  if (net0 > 0) {
-    const rm = Math.pow(montant / net0, 1 / n) - 1;
-    tauxAnnuel = (Math.pow(1 + rm, 12) - 1) * 100;
-    valeur = k => net0 * Math.pow(1 + rm, k);
-  } else valeur = k => net0 + (montant - net0) * k / n;
-  const points = Array.from({ length: n + 1 }, (_, k) => ({ mois: ajouterMois(m0, k), k, net: r2(valeur(k)) }));
-  points[n].net = r2(montant);
-  return { mFin, n, tauxAnnuel, points, parMois: r2((montant - net0) / n) };
+
+// ── Hypothèses de placement (comme la V1) ──
+// { id, nom, debut: 'AAAA-MM', montantInitial, versementMensuel, versementAnnuel, rendement (%/an), duree (ans | null), visible }
+// Capitalisation mensuelle au taux r/12 ; versement annuel en fin de chaque année ;
+// après la durée, plus de versement mais le capital continue de rapporter.
+function gainHypothese(h, mois) {
+  const t = ecartMois(h.debut, mois); // mois écoulés depuis le début
+  if (t <= 0) return 0;
+  const rm = (+h.rendement || 0) / 100 / 12;
+  const v0 = +h.montantInitial || 0, vm = +h.versementMensuel || 0, va = +h.versementAnnuel || 0;
+  const dureeMois = h.duree ? Math.round(+h.duree * 12) : null;
+  const actif = dureeMois ? Math.min(t, dureeMois) : t;
+  let c;
+  if (rm > 0) {
+    const f = Math.pow(1 + rm, actif);
+    c = v0 * f + vm * (f - 1) / rm;
+    const n = Math.floor(actif / 12);
+    if (va > 0 && n > 0) { const fa = Math.pow(1 + rm, 12); c += va * Math.pow(1 + rm, actif - 12 * n) * (Math.pow(fa, n) - 1) / (fa - 1); }
+  } else c = v0 + vm * actif + va * Math.floor(actif / 12);
+  const apres = dureeMois ? Math.max(0, t - dureeMois) : 0;
+  if (apres > 0 && rm > 0) c *= Math.pow(1 + rm, apres);
+  return r2(c);
+}
+function hypotheses(state) {
+  const l = state.reglages && state.reglages.hypotheses;
+  return Array.isArray(l) ? l : [];
+}
+// Hypothèses du couple : comptées pour moitié en vue Clément ou Alexandre.
+const partHypothese = filtre => filtre === 'foyer' ? 1 : 0.5;
+// Courbe = projection de base + gains des hypothèses données.
+function courbeAvecHypotheses(base, liste, filtre) {
+  const p = partHypothese(filtre);
+  return base.map(pt => ({ mois: pt.mois, k: pt.k, net: r2(pt.net + p * liste.reduce((t, h) => t + gainHypothese(h, pt.mois), 0)) }));
+}
+
+// ── Objectif : trajectoire linéaire ──
+// Droite entre le premier snapshot (date et net du couple) et le montant visé à l'échéance.
+// Fixe dans le temps : chaque mois, on se compare à la même droite.
+function echeanceObjectif(o) {
+  if (!o || !(+o.montant > 0)) return null;
+  if (o.echeance && /^\d{4}-\d{2}$/.test(o.echeance)) return o.echeance;
+  return o.annee ? `${o.annee}-01` : null; // V1 : objectif atteint au 1er janvier de l'année visée
+}
+function trajectoireObjectif(state) {
+  const o = state.reglages && state.reglages.objectif, fin = echeanceObjectif(o);
+  if (!fin) return null;
+  const snaps = [...state.snapshots].sort((a, b) => a.date.localeCompare(b.date));
+  if (!snaps.length) return null;
+  const debut = moisDe(snaps[0].date), net0 = snapshotTotaux(state, snaps[0], 'foyer').net;
+  const n = ecartMois(debut, fin);
+  if (n <= 0) return null;
+  const montant = +o.montant, pente = (montant - net0) / n;
+  const valeurA = mois => { const k = ecartMois(debut, mois); return k < 0 || k > n ? null : r2(net0 + pente * k); };
+  return { debut, fin, net0, montant, n, parMois: r2(pente), valeurA };
 }
 
 // ── Import / export ──
@@ -615,7 +657,7 @@ root.Model = { TYPES, CATEGORIES, PROPRIETAIRES, FILTRES, r2, part, dateISO, moi
   crdA, finCredit, dettesCompte, genererEcheancier, lireNombre, lireMois, parserTableauAmortissement,
   comptesActifs, parOrdre, situation, snapshotTotaux, historique, construireSnapshot,
   aDesHypotheses, croissance, projection, validerDonnees, exporter,
-  CATS_SIMULEES, SCENARIOS_DEFAUT, scenarios, tauxCompte, valeurFuture, trajectoireObjectif };
+  valeurFuture, gainHypothese, hypotheses, courbeAvecHypotheses, partHypothese, echeanceObjectif, trajectoireObjectif, detailEcheancier };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 
@@ -920,10 +962,13 @@ function pageTableau() {
       <div class="repartition">${[['Clément', c], ['Alexandre', a]].map(([n, v]) => `<div class="rep-ligne"><span>${n}</span><span class="num">${eur(v)}</span></div>`).join('')}</div>`;
   }
 
-  const obj = state.reglages && state.reglages.objectif;
-  const objectif = obj && obj.montant ? `<div class="carte"><h2>Objectif <span class="muted num" style="font-weight:400">${eur(obj.montant)} en ${obj.annee}</span></h2>
+  const obj = objectifCourant();
+  const ecObj = obj && ui.filtre === 'foyer' ? ecartObjectif(M.trajectoireObjectif(state)) : null;
+  const objectif = obj ? `<div class="carte"><h2>Objectif <span class="muted num" style="font-weight:400">${eur(obj.montant)} · ${moisLong(M.echeanceObjectif(obj))}</span></h2>
       <div class="objectif-barre"><span style="width:${Math.min(100, Math.max(0, s.net / obj.montant * 100))}%"></span></div>
-      <div class="sous">${pct(s.net / obj.montant * 100)} atteint · reste ${eur(Math.max(0, obj.montant - s.net))}</div></div>` : '';
+      <div class="sous">${pct(s.net / obj.montant * 100)} atteint · reste ${eur(Math.max(0, obj.montant - s.net))}</div>
+      ${ecObj ? `<div class="ecart-obj ${ecObj.ecart >= 0 ? 'pos' : 'neg'}" style="margin-top:10px"><span>Vs trajectoire au ${dateCourte(ecObj.date)}</span><strong class="num">${eurSigne(ecObj.ecart)}</strong></div>` : ''}
+      <a href="#/projection" class="sous" style="display:inline-block;margin-top:8px">Modifier dans Projection →</a></div>` : '';
 
   const jours = dernier ? joursDepuis(dernier.snapshot.date) : null;
   return `
@@ -1072,11 +1117,14 @@ function pageHistorique() {
   const premier = hist[0], dernier = hist[hist.length - 1];
   const nbMois = Math.max(1, M.ecartMois(M.moisDe(premier.snapshot.date), M.moisDe(dernier.snapshot.date)));
   if (!ui.histSel || !hist.some(h => h.snapshot.date === ui.histSel)) ui.histSel = dernier.snapshot.date;
+  const traj = ui.filtre === 'foyer' && objectifCourant() ? M.trajectoireObjectif(state) : null;
   const lignes = [...hist].reverse().map((h, i, arr) => {
     const p = arr[i + 1], d = p ? h.net - p.net : null;
+    const o = traj ? traj.valeurA(M.moisDe(h.snapshot.date)) : null;
     return `<tr class="cliquable ${h.snapshot.date === ui.histSel ? 'selection' : ''}" data-action="hist-select" data-date="${h.snapshot.date}">
       <td>${dateFr(h.snapshot.date)}</td><td class="d num">${eur(h.net)}</td>
-      <td class="d num ${d == null ? 'muted' : classeSigne(d)}">${d == null ? '—' : eurSigne(d)}</td></tr>`;
+      <td class="d num ${d == null ? 'muted' : classeSigne(d)}">${d == null ? '—' : eurSigne(d)}</td>
+      ${traj ? `<td class="d num ${o == null ? 'muted' : classeSigne(h.net - o)}">${o == null ? '—' : eurSigne(h.net - o)}</td>` : ''}</tr>`;
   }).join('');
   return `
     <div class="titre-page"><div><h1>Historique</h1><p>Vue ${esc(filtreLib())} · ${hist.length} mise${hist.length > 1 ? 's' : ''} à jour depuis ${moisLong(M.moisDe(premier.snapshot.date))}</p></div></div>
@@ -1085,10 +1133,10 @@ function pageHistorique() {
         <span class="pastille">Évolution : <strong class="${classeSigne(dernier.net - premier.net)}">${eurSigne(dernier.net - premier.net)}</strong></span>
         ${hist.length > 1 ? `<span class="pastille">Moyenne : <strong class="${classeSigne(dernier.net - premier.net)}">${eurSigne((dernier.net - premier.net) / nbMois)}</strong> / mois</span>` : ''}
       </div>
-      <div class="graph-grand"><canvas id="g-hist"></canvas></div>
+      ${enteteZoom('hist', 'zoom-hist')}<div class="graph-grand"><canvas id="g-hist"></canvas></div>
     </div>
     <div class="grille g-2" style="margin-top:16px">
-      <div class="carte"><h2>Snapshots</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Date</th><th class="d">Net</th><th class="d">Variation</th></tr></thead><tbody>${lignes}</tbody></table></div></div>
+      <div class="carte"><h2>Snapshots</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Date</th><th class="d">Net</th><th class="d">Variation</th>${traj ? '<th class="d">Vs objectif</th>' : ''}</tr></thead><tbody>${lignes}</tbody></table></div></div>
       <div class="carte" id="hist-detail">${detailSnapshot(hist)}</div>
     </div>`;
 }
@@ -1128,34 +1176,88 @@ function graphHistorique() {
   const m0 = M.moisDe(hist[0].snapshot.date), m1 = M.moisDe(hist[hist.length - 1].snapshot.date);
   const mois = Array.from({ length: M.ecartMois(m0, m1) + 1 }, (_, i) => M.ajouterMois(m0, i));
   const acc = css('--accent');
-  const opts = optionsGraph();
-  opts.plugins.tooltip.callbacks.title = items => { const h = parMois.get(mois[items[0].dataIndex]); return h ? dateFr(h.snapshot.date) : ''; };
+  const traj = ui.filtre === 'foyer' && objectifCourant() ? M.trajectoireObjectif(state) : null;
+  const opts = activerZoom(optionsGraph({ legende: !!traj }), 'zoom-hist');
+  opts.plugins.tooltip.callbacks.title = items => { const h = parMois.get(mois[items[0].dataIndex]); return h ? dateFr(h.snapshot.date) : moisLong(mois[items[0].dataIndex]); };
+  opts.plugins.tooltip.callbacks.label = etiquetteAvecEcart(traj, mois);
   opts.onClick = (e, els) => { if (!els.length) return; const h = parMois.get(mois[els[0].index]); if (h) { ui.histSel = h.snapshot.date; ui.histEdition = false; setTimeout(rendre, 0); } };
   charts.hist = new Chart(el, {
     type: 'line',
     data: { labels: mois.map(moisFr), datasets: [{ label: 'Patrimoine net', data: mois.map(m => parMois.has(m) ? parMois.get(m).net : null), spanGaps: true,
       borderColor: acc, backgroundColor: acc + '1f', fill: true, tension: .25, borderWidth: 2.5,
       pointRadius: mois.map(m => parMois.has(m) && parMois.get(m).snapshot.date === ui.histSel ? 7 : 4),
-      pointBackgroundColor: acc, pointBorderColor: css('--surface'), pointBorderWidth: 2 }] },
+      pointBackgroundColor: acc, pointBorderColor: css('--surface'), pointBorderWidth: 2 },
+      ...(traj ? [{ label: 'Trajectoire objectif', estObjectif: true, data: mois.map(traj.valeurA), borderColor: css('--cat-crypto'), backgroundColor: css('--cat-crypto'), borderWidth: 2, borderDash: [3, 4], pointRadius: 0, tension: 0, fill: false }] : [])] },
     options: opts,
   });
 }
 
+// ── Zoom des graphiques ───────────────────────────────────────────────
+// Molette ou pincement pour zoomer, glisser pour se déplacer. L'axe vertical se recale
+// sur la partie visible pour bien lire l'écart entre les courbes.
+if (typeof Chart !== 'undefined' && window.ChartZoom) { try { Chart.register(window.ChartZoom); } catch {} }
+function ajusterAxeY(chart) {
+  const x = chart.scales.x, i0 = Math.max(0, Math.floor(x.min)), i1 = Math.ceil(x.max);
+  let lo = Infinity, hi = -Infinity;
+  chart.data.datasets.forEach((ds, k) => {
+    if (!chart.isDatasetVisible(k)) return;
+    for (let i = i0; i <= i1; i++) { const v = ds.data[i]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+  });
+  if (lo === Infinity) return;
+  // bornes arrondies à un pas « rond » pour des graduations lisibles
+  const brut = Math.max((hi - lo) / 5, 100), p10 = Math.pow(10, Math.floor(Math.log10(brut)));
+  const pas = [1, 2, 2.5, 5, 10].map(x => x * p10).find(x => x >= brut);
+  chart.options.scales.y.min = Math.floor(lo / pas) * pas; chart.options.scales.y.max = Math.ceil(hi / pas) * pas;
+  chart.update('none');
+}
+function activerZoom(opts, idBouton) {
+  if (!window.ChartZoom) return opts;
+  const apres = ({ chart }) => { ajusterAxeY(chart); const b = $('#' + idBouton); if (b) b.hidden = false; };
+  opts.plugins.zoom = {
+    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x', onZoomComplete: apres },
+    pan: { enabled: true, mode: 'x', onPanComplete: apres },
+    limits: { x: { minRange: 2 } },
+  };
+  return opts;
+}
+function reinitZoom(nom, idBouton) {
+  const c = charts[nom]; if (!c) return;
+  if (c.resetZoom) c.resetZoom('none');
+  c.options.scales.y.min = undefined; c.options.scales.y.max = undefined;
+  c.update('none');
+  const b = $('#' + idBouton); if (b) b.hidden = true;
+}
+const enteteZoom = (nom, id) => window.ChartZoom ? `<div class="zoom-barre"><span class="sous">Molette ou pincer pour zoomer · glisser pour se déplacer</span>
+  <button class="btn btn-petit" id="${id}" data-action="zoom-reinit" data-graph="${nom}" hidden>Réinitialiser le zoom</button></div>` : '';
+// Libellé d'infobulle : valeur + écart à la trajectoire de l'objectif pour ce mois.
+function etiquetteAvecEcart(traj, mois) {
+  return c => {
+    let t = ` ${c.dataset.label} : ${eur(c.parsed.y)}`;
+    if (traj && !c.dataset.estObjectif) { const o = traj.valeurA(mois[c.dataIndex]); if (o != null) t += ` (${eurSigne(c.parsed.y - o)} vs objectif)`; }
+    return t;
+  };
+}
+
 // ── Projection ────────────────────────────────────────────────────────
-const COULEURS_SCENARIOS = { prudent: '--cat-liquidites', central: '--cat-placements', dynamique: '--cat-salariale' };
-const LIB_CAT_SIM = { immobilier: 'Immobilier (revalorisation des biens)' };
-const libCatSim = k => LIB_CAT_SIM[k] || M.CATEGORIES[k];
+const COULEURS_HYP = ['--cat-placements', '--cat-salariale', '--cat-liquidites', '--cat-obligations', '--cat-immobilier', '--cat-autre'];
+const couleurHyp = i => COULEURS_HYP[i % COULEURS_HYP.length];
 const nombreFr = (v, d = 2) => (+v || 0).toLocaleString('fr-FR', { maximumFractionDigits: d });
-// Courbes affichées : sans rendement + scénarios cochés.
+const objectifCourant = () => { const o = state.reglages && state.reglages.objectif; return M.echeanceObjectif(o) ? o : null; };
+// Courbes : projection de base, chaque hypothèse affichée, total des hypothèses (si plusieurs).
 function courbesProjection() {
-  const h = ui.horizon * 12;
-  const courbes = [{ id: 'base', nom: 'Sans rendement', pts: M.projection(state, ui.filtre, h) }];
-  M.scenarios(state).filter(sc => sc.actif).forEach(sc => courbes.push({ id: sc.id, nom: sc.nom, sc, pts: M.projection(state, ui.filtre, h, undefined, sc) }));
+  const base = M.projection(state, ui.filtre, ui.horizon * 12);
+  const hyps = M.hypotheses(state);
+  const courbes = [{ id: 'base', nom: 'Projection de base', couleur: '--text3', tirets: true, pts: base }];
+  hyps.forEach((h, i) => { if (h.visible !== false) courbes.push({ id: h.id, nom: h.nom || `Hypothèse ${i + 1}`, couleur: couleurHyp(i), pts: M.courbeAvecHypotheses(base, [h], ui.filtre) }); });
+  if (hyps.length > 1 && (state.reglages || {}).totalHypotheses !== false) courbes.push({ id: 'total', nom: 'Avec toutes les hypothèses', couleur: '--text', epais: true, pts: M.courbeAvecHypotheses(base, hyps, ui.filtre) });
   return courbes;
 }
-function objectifCourant() {
-  const o = state.reglages && state.reglages.objectif;
-  return o && o.montant > 0 && o.annee ? o : null;
+// Écart du dernier snapshot à la trajectoire (vue Couple).
+function ecartObjectif(traj) {
+  if (!traj) return null;
+  const h = M.historique(state, 'foyer').pop(); if (!h) return null;
+  const o = traj.valeurA(M.moisDe(h.snapshot.date)); if (o == null) return null;
+  return { date: h.snapshot.date, net: h.net, objectif: o, ecart: M.r2(h.net - o) };
 }
 function pageProjection() {
   if (!state.comptes.length) return vueVide();
@@ -1163,50 +1265,57 @@ function pageProjection() {
   const H = ui.horizon * 12;
   const ks = [12, 60, 120, H].filter((k, i, a) => k <= H && a.indexOf(k) === i);
   const libK = k => `Dans ${k / 12} an${k > 12 ? 's' : ''}`;
-  const obj = objectifCourant();
-  const traj = obj ? M.trajectoireObjectif(base[0].net, base[0].mois, obj.montant, obj.annee) : null;
-  const atteinte = c => { if (!obj) return ''; const p = c.pts.find(x => x.net >= obj.montant);
+  const obj = objectifCourant(), couple = ui.filtre === 'foyer';
+  const traj = obj ? M.trajectoireObjectif(state) : null;
+  const ec = couple ? ecartObjectif(traj) : null;
+  const atteinte = c => { const p = c.pts.find(x => x.net >= +obj.montant);
     if (!p) return `<span class="muted">après ${base[base.length - 1].mois.slice(0, 4)}</span>`;
-    return `<span class="${p.mois <= `${obj.annee}-12` ? 'pos' : 'neg'}">${moisLong(p.mois)}</span>`; };
-  let texteObj = '<p class="sous">Saisis un montant et une année : la trajectoire à suivre s’affiche sur le graphique.</p>';
-  if (obj && traj) texteObj = `<p class="obj-phrase">Pour passer de <strong class="num">${eur(base[0].net)}</strong> à <strong class="num">${eur(obj.montant)}</strong> fin ${obj.annee}, ton patrimoine net ${esc(ui.filtre === 'foyer' ? 'du couple' : 'de ' + filtreLib())} doit progresser de
-      ${traj.tauxAnnuel != null ? `<strong>${nombreFr(traj.tauxAnnuel, 1)} % par an</strong> en moyenne, soit` : ''} environ <strong class="num">${eur(traj.parMois)}</strong> par mois.</p>`;
-  else if (obj) texteObj = `<p class="sous">L’année visée est déjà passée : choisis une année future.</p>`;
-  if (obj && base[0].net >= obj.montant) texteObj = `<p class="obj-phrase pos">Objectif de ${eur(obj.montant)} déjà atteint.</p>`;
-
-  const scs = M.scenarios(state);
-  const cats = M.CATS_SIMULEES.filter(k => k === 'placements' || M.comptesActifs(state).some(c => c.type !== 'courant' && M.TYPES[c.type].cat === k));
-  const champ = (sc, cle, val, suffixe, attrs) => `<div class="champ-sim${sc.actif ? '' : ' off'}"><input id="sim-${sc.id}-${cle}" inputmode="decimal" value="${esc(nombreFr(val))}" ${attrs} aria-label="${esc(sc.nom)} · ${esc(cle)}"><span>${suffixe}</span></div>`;
+    return `<span class="${p.mois <= traj.fin ? 'pos' : 'neg'}" style="white-space:nowrap">${moisFr(p.mois)}</span>`; };
+  let texteObj = '<p class="sous">Saisis un montant et une échéance : une droite part de ton premier snapshot et rejoint l’objectif. Chaque mois, tu te compares à cette droite.</p>';
+  if (obj && !traj) texteObj = '<p class="sous">L’échéance doit être postérieure à ton premier snapshot.</p>';
+  else if (traj && !couple) texteObj = '<p class="sous">L’objectif porte sur le patrimoine du couple : passe en vue Couple pour voir la trajectoire.</p>';
+  else if (traj) texteObj = `<p class="obj-phrase">Trajectoire : de <strong class="num">${eur(traj.net0)}</strong> (${moisLong(traj.debut)}) à <strong class="num">${eur(traj.montant)}</strong> (${moisLong(traj.fin)}), soit <strong class="num">${eurSigne(traj.parMois)}</strong> par mois.</p>
+    ${ec ? `<div class="ecart-obj ${ec.ecart >= 0 ? 'pos' : 'neg'}"><span>Au ${dateCourte(ec.date)} : ${eur(ec.net)} pour ${eur(ec.objectif)} prévus</span><strong class="num">${eurSigne(ec.ecart)}</strong></div>` : ''}`;
+  const hyps = M.hypotheses(state);
+  const pastille = v => `<span class="pastille-serie" style="background:var(${v})"></span>`;
+  const lignesHyp = hyps.map((h, i) => `<tr>
+      <td><span class="nom-serie">${pastille(couleurHyp(i))}${esc(h.nom || `Hypothèse ${i + 1}`)}</span></td>
+      <td class="text2">${esc(moisFr(h.debut))}</td>
+      <td class="d num">${+h.montantInitial ? eur(h.montantInitial) : '—'}</td>
+      <td class="d num">${[+h.versementMensuel ? eur(h.versementMensuel) + '/mois' : '', +h.versementAnnuel ? eur(h.versementAnnuel) + '/an' : ''].filter(Boolean).join(' + ') || '—'}</td>
+      <td class="d">${nombreFr(h.rendement)} %/an</td>
+      <td class="d text2">${h.duree ? h.duree + ' ans' : '∞'}</td>
+      <td class="d" style="white-space:nowrap"><button class="btn btn-petit ${h.visible !== false ? 'actif-doux' : ''}" data-action="hyp-courbe" data-id="${esc(h.id)}" title="Afficher ou masquer la courbe">${h.visible !== false ? 'Courbe affichée' : 'Courbe masquée'}</button>
+        <button class="btn btn-petit" data-action="hyp-modifier" data-id="${esc(h.id)}">Modifier</button>
+        <button class="btn btn-petit btn-danger" data-action="hyp-supprimer" data-id="${esc(h.id)}" aria-label="Supprimer">×</button></td></tr>`).join('');
   const finsCredits = state.credits.map(c => ({ c, compte: state.comptes.find(x => x.id === c.compteId), fin: M.finCredit(c), crd: M.crdA(c, M.moisDe(M.dateISO())) }))
     .filter(x => x.compte && x.compte.actif !== false && x.crd > 0).sort((a, b) => (a.fin || '').localeCompare(b.fin || ''));
-  const pastille = id => `<span class="pastille-serie" style="background:var(${id === 'base' ? '--text3' : COULEURS_SCENARIOS[id]})"></span>`;
   return `
     <div class="titre-page"><div><h1>Projection</h1><p>Vue ${esc(filtreLib())} · à partir de ton patrimoine net d’aujourd’hui</p></div>
       <div class="segment" role="group" aria-label="Horizon">${[5, 10, 20, 30].map(h => `<button data-action="horizon" data-h="${h}" class="${ui.horizon === h ? 'actif' : ''}">${h} ans</button>`).join('')}</div></div>
-    <div class="carte"><div class="graph-grand"><canvas id="g-proj"></canvas></div></div>
+    <div class="carte">${enteteZoom('proj', 'zoom-proj')}<div class="graph-grand"><canvas id="g-proj"></canvas></div></div>
     <div class="grille g-proj">
       <div class="carte"><h2>Objectif</h2>
-        <div class="champs" style="grid-template-columns:1.4fr 1fr">
+        <div class="champs" style="grid-template-columns:1.3fr 1fr">
           <div class="champ"><label for="pobj-montant">Montant (€)</label><input id="pobj-montant" data-obj inputmode="decimal" value="${esc(obj ? saisie(obj.montant) : '')}" placeholder="Ex : 1 000 000"></div>
-          <div class="champ"><label for="pobj-annee">Année</label><input id="pobj-annee" data-obj inputmode="numeric" maxlength="4" value="${esc(obj ? obj.annee : '')}" placeholder="Ex : 2046"></div>
+          <div class="champ"><label for="pobj-echeance">Échéance</label><input id="pobj-echeance" data-obj type="month" value="${esc(obj ? M.echeanceObjectif(obj) : '')}"></div>
         </div>
         <div style="margin-top:12px">${texteObj}</div>
       </div>
-      <div class="carte"><h2>Résultats</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Courbe</th>${ks.map(k => `<th class="d">${libK(k)}</th>`).join('')}${obj ? '<th class="d">Objectif atteint</th>' : ''}</tr></thead><tbody>
-        ${courbes.map(c => `<tr><td><span class="nom-serie">${pastille(c.id)}${esc(c.nom)}</span></td>${ks.map(k => `<td class="d num">${eur(c.pts[k].net)}</td>`).join('')}${obj ? `<td class="d">${atteinte(c)}</td>` : ''}</tr>`).join('')}
+      <div class="carte"><h2>Résultats</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Courbe</th>${ks.map(k => `<th class="d">${libK(k)}</th>`).join('')}${traj && couple ? '<th class="d">Objectif</th>' : ''}</tr></thead><tbody>
+        ${courbes.map(c => `<tr><td><span class="nom-serie">${pastille(c.couleur)}${esc(c.nom)}</span></td>${ks.map(k => `<td class="d num">${eur(c.pts[k].net)}</td>`).join('')}${traj && couple ? `<td class="d">${atteinte(c)}</td>` : ''}</tr>`).join('')}
       </tbody></table></div>
-      <p class="sous" style="margin-top:10px">« Sans rendement » : valeurs figées, seul le remboursement des crédits fait progresser le net.</p></div>
+      <p class="sous" style="margin-top:10px">Projection de base : valeurs actuelles figées, seuls tes crédits se remboursent.${hyps.length ? ' Les hypothèses s’y ajoutent.' : ''}</p></div>
     </div>
-    <div class="carte"><div class="carte-titre"><h2>Hypothèses de placement</h2><button class="btn btn-petit" data-action="sim-defaut">Valeurs par défaut</button></div>
-      <div class="tab-scroll"><table class="tab tab-sim"><thead><tr><th>Rendement annuel</th>${scs.map(sc => `<th class="d"><label class="entete-sc">${pastille(sc.id)}<input type="checkbox" id="sim-${sc.id}-actif" data-sim="actif" data-sc="${sc.id}" ${sc.actif ? 'checked' : ''}> ${esc(sc.nom)}</label></th>`).join('')}</tr></thead><tbody>
-        ${cats.map(k => `<tr><td>${esc(libCatSim(k))}</td>${scs.map(sc => `<td class="d">${champ(sc, k, sc.taux[k], '%', `data-sim="taux" data-sc="${sc.id}" data-cat="${k}"`)}</td>`).join('')}</tr>`).join('')}
-        <tr class="ligne-epargne"><td>Épargne mensuelle du couple</td>${scs.map(sc => `<td class="d">${champ(sc, 'epargne', sc.epargne, '€', `data-sim="epargne" data-sc="${sc.id}"`)}</td>`).join('')}</tr>
-      </tbody></table></div>
-      <p class="sous" style="margin-top:10px">Taux nets de frais, appliqués à la valeur actuelle de chaque compte. Les comptes courants ne rapportent rien. Un rendement saisi sur un compte (page Comptes) remplace celui du scénario.
-        L’épargne mensuelle est placée au taux « ${esc(M.CATEGORIES.placements)} » ; en vue Clément ou Alexandre, la moitié est comptée. Coche ou décoche un scénario pour l’afficher.</p>
+    <div class="carte"><div class="carte-titre"><h2>Hypothèses de placement</h2><button class="btn btn-petit btn-primaire" data-action="hyp-ajouter">+ Nouvelle hypothèse</button></div>
+      ${hyps.length ? `<div class="tab-scroll"><table class="tab"><thead><tr><th>Nom</th><th>Début</th><th class="d">Capital initial</th><th class="d">Versements</th><th class="d">Rendement</th><th class="d">Durée</th><th></th></tr></thead><tbody>${lignesHyp}</tbody></table></div>
+        ${hyps.length > 1 ? `<label class="case-total"><input type="checkbox" data-action="hyp-total" ${(state.reglages || {}).totalHypotheses !== false ? 'checked' : ''}> Afficher aussi la courbe « Avec toutes les hypothèses »</label>` : ''}
+        <p class="sous" style="margin-top:10px">Chaque courbe = projection de base + l’hypothèse. Capitalisation mensuelle ; après la durée, plus de versement mais le capital continue de rapporter.${ui.filtre !== 'foyer' ? ' En vue individuelle, la moitié est comptée.' : ''}</p>`
+        : '<p class="sous">Aucune hypothèse. Exemple : « ETF World, 500 €/mois à 6 %/an à partir de janvier ». Chaque hypothèse a sa propre courbe, que tu affiches ou non.</p>'}
     </div>
-    ${finsCredits.length ? `<div class="carte"><h2>Fin des crédits</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Crédit</th><th class="d">Restant dû</th><th class="d">Fin</th></tr></thead><tbody>
-      ${finsCredits.map(x => `<tr><td><div class="nom-compte">${esc(x.c.nom)}</div><div class="sous">${esc(x.compte.nom)}</div></td><td class="d num">${eur(x.crd)}</td><td class="d">${x.fin ? moisLong(x.fin) : '—'}</td></tr>`).join('')}
+    ${finsCredits.length ? `<div class="carte"><h2>Fin des crédits</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Crédit</th><th class="d">Restant dû</th><th class="d">Fin</th><th></th></tr></thead><tbody>
+      ${finsCredits.map(x => `<tr><td><div class="nom-compte">${esc(x.c.nom)}</div><div class="sous">${esc(x.compte.nom)}</div></td><td class="d num">${eur(x.crd)}</td><td class="d">${x.fin ? moisLong(x.fin) : '—'}</td>
+        <td class="d"><button class="btn btn-petit" data-action="credit-tableau" data-id="${esc(x.c.id)}">Tableau</button></td></tr>`).join('')}
     </tbody></table></div></div>` : ''}`;
 }
 function graphProjection() {
@@ -1219,48 +1328,99 @@ function graphProjection() {
   const mFin = base[base.length - 1].mois;
   const mois = Array.from({ length: M.ecartMois(mDebut, mFin) + 1 }, (_, i) => M.ajouterMois(mDebut, i));
   const serie = pts => { const m = new Map(pts.map(p => [p.mois, p.net])); return mois.map(x => m.has(x) ? m.get(x) : null); };
+  const traj = ui.filtre === 'foyer' && objectifCourant() ? M.trajectoireObjectif(state) : null;
   const acc = css('--accent');
-  const opts = optionsGraph({ legende: true });
+  const opts = activerZoom(optionsGraph({ legende: true }), 'zoom-proj');
   opts.scales.x.ticks.maxTicksLimit = innerWidth < 640 ? 4 : 10;
   opts.elements = { point: { radius: 0, hoverRadius: 4 } };
+  opts.plugins.tooltip.callbacks.label = etiquetteAvecEcart(traj, mois);
+  opts.plugins.tooltip.callbacks.title = items => moisLong(mois[items[0].dataIndex]);
   const datasets = [
     { label: 'Historique', data: mois.map(m => parMois.has(m) ? parMois.get(m).net : null), spanGaps: true, borderColor: acc, backgroundColor: acc, borderWidth: 2.5, pointRadius: mois.map(m => parMois.has(m) ? 3 : 0), tension: .2 },
   ];
-  courbes.forEach(c => {
-    const coul = css(c.id === 'base' ? '--text3' : COULEURS_SCENARIOS[c.id]);
-    datasets.push({ label: c.nom, data: serie(c.pts), borderColor: coul, backgroundColor: coul, borderWidth: 2, borderDash: c.id === 'base' ? [6, 4] : [], tension: .1 });
-  });
-  const obj = objectifCourant();
-  const traj = obj ? M.trajectoireObjectif(base[0].net, base[0].mois, obj.montant, obj.annee) : null;
   if (traj) {
-    const coul = css('--cat-crypto'), data = serie(traj.points);
-    datasets.push({ label: `Objectif ${eur(obj.montant)} (${obj.annee})`, data, borderColor: coul, backgroundColor: coul, borderWidth: 2, borderDash: [2, 4],
-      pointRadius: mois.map(m => m === traj.mFin ? 5 : 0), pointStyle: 'rectRot', tension: 0 });
+    const coul = css('--cat-crypto');
+    datasets.push({ label: `Objectif ${eur(traj.montant)}`, estObjectif: true, data: mois.map(traj.valeurA), borderColor: coul, backgroundColor: coul, borderWidth: 2, borderDash: [3, 4], tension: 0,
+      pointRadius: mois.map(m => m === traj.fin ? 5 : 0), pointStyle: 'rectRot' });
   }
+  courbes.forEach(c => {
+    const coul = css(c.couleur);
+    datasets.push({ label: c.nom, data: serie(c.pts), borderColor: coul, backgroundColor: coul, borderWidth: c.epais ? 2.5 : 2, borderDash: c.tirets ? [6, 4] : [], tension: .1 });
+  });
   charts.proj = new Chart(el, { type: 'line', data: { labels: mois.map(moisFr), datasets }, options: opts });
 }
-function enregistrerSimulation(modif) {
-  const scs = M.scenarios(state).map(sc => JSON.parse(JSON.stringify(sc)));
-  modif(scs);
-  ecrire(store.enregistrerReglages({ simulation: { scenarios: scs } })).catch(() => {});
-}
 function surChangementProjection(t) {
-  if (t.dataset.sim) {
-    const id = t.dataset.sc;
-    if (t.dataset.sim === 'actif') return enregistrerSimulation(scs => { scs.find(x => x.id === id).actif = t.checked; });
-    const v = M.lireNombre(t.value);
-    if (v == null || (t.dataset.sim === 'epargne' ? v < 0 : (v < -50 || v > 50))) { toast(t.dataset.sim === 'epargne' ? 'Épargne invalide.' : 'Taux invalide (entre −50 et 50 %).', 'erreur'); return rendreApresFocus(); }
-    return enregistrerSimulation(scs => { const sc = scs.find(x => x.id === id); if (t.dataset.sim === 'epargne') sc.epargne = v; else sc.taux[t.dataset.cat] = v; });
-  }
-  if ('obj' in t.dataset) {
-    const brutM = $('#pobj-montant').value.trim(), brutA = $('#pobj-annee').value.trim();
-    if (!brutM) return ecrire(store.enregistrerReglages({ objectif: null })).catch(() => {});
-    const montant = M.lireNombre(brutM), annee = parseInt(brutA, 10);
-    if (montant == null || montant <= 0) return toast('Montant invalide.', 'erreur');
-    if (!brutA) return; // on attend l'année
-    if (!(annee >= 2000 && annee < 2200)) return toast('Année invalide.', 'erreur');
-    ecrire(store.enregistrerReglages({ objectif: { montant: M.r2(montant), annee } })).catch(() => {});
-  }
+  if (!('obj' in t.dataset)) return;
+  const brutM = $('#pobj-montant').value.trim(), ech = $('#pobj-echeance').value;
+  if (!brutM) return ecrire(store.enregistrerReglages({ objectif: null })).catch(() => {});
+  const montant = M.lireNombre(brutM);
+  if (montant == null || montant <= 0) return toast('Montant invalide.', 'erreur');
+  if (!ech) return; // on attend l'échéance
+  if (!/^\d{4}-\d{2}$/.test(ech)) return toast('Échéance invalide.', 'erreur');
+  ecrire(store.enregistrerReglages({ objectif: { montant: M.r2(montant), annee: +ech.slice(0, 4), echeance: ech } })).catch(() => {});
+}
+// ── Hypothèses : formulaire ──
+function ouvrirHypothese(id) {
+  const liste = M.hypotheses(state), h = id ? liste.find(x => x.id === id) : null;
+  const dlg = $('#dialogue'); delete dlg.dataset.compte;
+  const val = v => v == null || v === '' || v === 0 ? '' : esc(saisie(v));
+  dlg.innerHTML = `<form method="dialog" id="f-hyp">
+    <div class="dlg-tete">${h ? 'Modifier l’hypothèse' : 'Nouvelle hypothèse'}</div>
+    <div class="dlg-corps"><div class="champs">
+      <div class="champ large"><label for="fh-nom">Nom</label><input id="fh-nom" maxlength="60" value="${esc(h ? h.nom || '' : '')}" placeholder="Ex : ETF World, SCPI…"></div>
+      <div class="champ"><label for="fh-debut">Début</label><input id="fh-debut" type="month" required value="${esc(h ? h.debut : M.moisDe(M.dateISO()))}"></div>
+      <div class="champ"><label for="fh-taux">Rendement annuel (%)</label><input id="fh-taux" inputmode="decimal" value="${val(h && h.rendement)}" placeholder="Ex : 6"></div>
+      <div class="champ"><label for="fh-mens">Versement mensuel (€)</label><input id="fh-mens" inputmode="decimal" value="${val(h && h.versementMensuel)}" placeholder="Ex : 500"></div>
+      <div class="champ"><label for="fh-ann">Versement annuel (€)</label><input id="fh-ann" inputmode="decimal" value="${val(h && h.versementAnnuel)}" placeholder="Une fois par an"></div>
+      <div class="champ"><label for="fh-init">Capital initial (€)</label><input id="fh-init" inputmode="decimal" value="${val(h && h.montantInitial)}" placeholder="Somme placée au départ"></div>
+      <div class="champ"><label for="fh-duree">Durée des versements (ans)</label><input id="fh-duree" inputmode="numeric" value="${val(h && h.duree)}" placeholder="Vide = sans fin"></div>
+    </div><p class="sous" style="margin-top:10px">Argent nouveau que tu placerais en plus de tes comptes actuels.</p></div>
+    <div class="dlg-pied"><button type="button" class="btn" data-action="fermer">Annuler</button><button type="submit" class="btn btn-primaire">${h ? 'Enregistrer' : 'Ajouter'}</button></div></form>`;
+  dlg.showModal();
+  $('#f-hyp').onsubmit = e => {
+    e.preventDefault();
+    const lire = sel => { const v = $(sel).value.trim(); return v ? M.lireNombre(v) : 0; };
+    const debut = $('#fh-debut').value, rendement = lire('#fh-taux'), vm = lire('#fh-mens'), va = lire('#fh-ann'), v0 = lire('#fh-init');
+    const dureeTxt = $('#fh-duree').value.trim(), duree = dureeTxt ? M.lireNombre(dureeTxt) : null;
+    if (!/^\d{4}-\d{2}$/.test(debut)) return toast('Date de début invalide.', 'erreur');
+    if ([rendement, vm, va, v0].some(x => x == null) || vm < 0 || va < 0 || v0 < 0 || rendement < -50 || rendement > 50) return toast('Montant ou rendement invalide.', 'erreur');
+    if (dureeTxt && !(duree > 0 && duree <= 60)) return toast('Durée invalide.', 'erreur');
+    if (!vm && !va && !v0) return toast('Indique au moins un capital initial ou un versement.', 'erreur');
+    const nouvelle = { id: h ? h.id : nouvelId(), nom: $('#fh-nom').value.trim(), debut, montantInitial: M.r2(v0), versementMensuel: M.r2(vm), versementAnnuel: M.r2(va), rendement, duree: duree || null, visible: h ? h.visible !== false : true };
+    const l = h ? liste.map(x => x.id === h.id ? nouvelle : x) : [...liste, nouvelle];
+    ecrire(store.enregistrerReglages({ hypotheses: l })).catch(() => {});
+    dlg.close();
+  };
+}
+function majHypotheses(f) { ecrire(store.enregistrerReglages({ hypotheses: f(M.hypotheses(state).map(x => Object.assign({}, x))) })).catch(() => {}); }
+
+// ── Tableau d'amortissement d'un crédit ──
+function ouvrirTableauCredit(id) {
+  const cr = state.credits.find(x => x.id === id); if (!cr) return;
+  const compte = state.comptes.find(x => x.id === cr.compteId);
+  const lignes = M.detailEcheancier(cr), mois = M.moisDe(M.dateISO());
+  const avecInt = lignes.some(l => l.interets != null);
+  const crd = M.crdA(cr, mois), fin = M.finCredit(cr);
+  const futures = lignes.filter(l => l.m > mois);
+  const intRestants = avecInt ? futures.reduce((t, l) => t + (l.interets || 0), 0) : null;
+  const dlg = $('#dlg-tableau');
+  dlg.innerHTML = `<div class="dlg-tete">${esc(cr.nom)}<div class="sous" style="font-weight:400">${esc(compte ? compte.nom : '')}</div></div>
+    <div class="dlg-corps">
+      <div class="jalons" style="margin-bottom:14px">
+        ${cr.capitalEmprunte ? `<div class="jalon"><div class="l">Emprunté</div><div class="v num">${eur(cr.capitalEmprunte)}</div></div>` : ''}
+        <div class="jalon"><div class="l">Restant dû</div><div class="v num">${eur(crd)}</div><div class="s">${moisLong(mois)}</div></div>
+        <div class="jalon"><div class="l">Fin</div><div class="v">${fin ? moisLong(fin) : '—'}</div><div class="s">${futures.filter(l => l.crd > 0 || l.capital).length} échéances restantes</div></div>
+        ${avecInt ? `<div class="jalon"><div class="l">Intérêts restants</div><div class="v num">${eur(intRestants)}</div></div>` : ''}
+      </div>
+      <div class="tab-scroll tableau-credit"><table class="tab"><thead><tr><th>Échéance</th><th class="d">Capital remboursé</th>${avecInt ? '<th class="d">Intérêts</th>' : ''}<th class="d">Restant dû</th></tr></thead><tbody>
+        ${lignes.map(l => `<tr class="${l.m === mois ? 'courant' : l.m < mois ? 'passe' : ''}"${l.m === mois ? ' id="ligne-courante"' : ''}><td>${moisFr(l.m)}</td>
+          <td class="d num">${l.capital == null ? '—' : eur(l.capital, 2)}</td>${avecInt ? `<td class="d num">${l.interets == null ? '—' : eur(l.interets, 2)}</td>` : ''}<td class="d num">${eur(l.crd, 2)}</td></tr>`).join('')}
+      </tbody></table></div>
+      ${avecInt ? '' : '<p class="sous" style="margin-top:8px">Intérêts non renseignés pour ce crédit : seul le capital est connu.</p>'}
+    </div>
+    <div class="dlg-pied"><button type="button" class="btn btn-primaire" data-action="fermer-tableau">Fermer</button></div>`;
+  dlg.showModal();
+  const l = $('#ligne-courante'); if (l) l.scrollIntoView({ block: 'center' });
 }
 
 // ── Comptes ───────────────────────────────────────────────────────────
@@ -1270,11 +1430,10 @@ function pageComptes() {
   const actifs = M.comptesActifs(state);
   const archives = state.comptes.filter(c => c.actif === false).sort(M.parOrdre);
   const avecPart = ui.filtre !== 'foyer';
-  const hyp = c => [c.taux ? `${String(c.taux).replace('.', ',')} %/an` : '', c.versement ? `+${eur(c.versement)}/mois` : ''].filter(Boolean).join(' · ');
   const cols = `<colgroup><col style="width:${avecPart ? 28 : 32}%"><col class="cache-mobile" style="width:16%"><col style="width:14%"><col class="cache-mobile" style="width:14%"><col style="width:14%">${avecPart ? '<col style="width:12%">' : ''}<col style="width:10%"></colgroup>`;
   const tableau = liste => `<div class="tab-scroll"><table class="tab tab-comptes">${cols}<thead><tr><th>Compte</th><th class="cache-mobile">Type</th><th class="d">Valeur</th><th class="d cache-mobile">Crédits</th><th class="d">Net</th>${avecPart ? `<th class="d">Part ${esc(filtreLib())}</th>` : ''}<th></th></tr></thead><tbody>
     ${liste.map(c => { const l = parId.get(c.id); return `<tr class="${avecPart && !l.part ? 'estompe' : ''}">
-      <td><div class="nom-compte">${esc(c.nom)}</div><div class="sous">${[c.groupe, hyp(c)].filter(Boolean).map(esc).join(' · ')}</div></td>
+      <td><div class="nom-compte">${esc(c.nom)}</div><div class="sous">${esc(c.groupe || '')}</div></td>
       <td class="cache-mobile text2">${esc(typeLib(c.type))}</td>
       <td class="d num">${eur(l.brut, 2)}</td>
       <td class="d num cache-mobile ${l.dettes ? 'neg' : 'muted'}">${l.dettes ? '−' + eur(l.dettes, 2) : '—'}</td>
@@ -1311,12 +1470,6 @@ function ouvrirCompte(id) {
         <div class="champ"><label for="fc-valeur" id="fc-valeur-lib">Valeur actuelle (€)</label><input id="fc-valeur" inputmode="decimal" required value="${esc(c ? saisie(c.valeur) : '')}"></div>
         <div class="champ"><label for="fc-groupe">Groupe (facultatif)</label><input id="fc-groupe" list="fc-groupes" maxlength="60" value="${esc(c ? c.groupe || '' : '')}" placeholder="Ex : SCI des Prêles"><datalist id="fc-groupes">${groupes.map(g => `<option value="${esc(g)}">`).join('')}</datalist></div>
       </div>
-      <div class="sep"></div>
-      <div class="sous-titre">Hypothèses de projection <span class="muted" style="font-weight:400">(facultatif)</span></div>
-      <div class="champs">
-        <div class="champ"><label for="fc-taux">Rendement annuel (%)</label><input id="fc-taux" inputmode="decimal" value="${esc(c && c.taux != null ? saisie(c.taux) : '')}" placeholder="vide = selon le scénario"></div>
-        <div class="champ"><label for="fc-versement">Versement mensuel (€)</label><input id="fc-versement" inputmode="decimal" value="${esc(c && c.versement != null ? saisie(c.versement) : '')}" placeholder="vide = 0"></div>
-      </div>
       <div id="fc-credits"></div>
     </div>
     <div class="dlg-pied">
@@ -1339,6 +1492,7 @@ function blocCredits(c) {
   const mois = M.moisDe(M.dateISO());
   const liste = creditsDe(c.id).map(cr => `<div class="credit-ligne"><div class="infos"><div class="nom-compte">${esc(cr.nom)}</div>
     <div class="sous">Restant dû : <span class="num">${eur(M.crdA(cr, mois), 2)}</span> · fin ${M.finCredit(cr) ? moisLong(M.finCredit(cr)) : '—'} · ${cr.echeancier.length} échéances</div></div>
+    <button type="button" class="btn btn-petit" data-action="credit-tableau" data-id="${esc(cr.id)}">Tableau</button>
     <button type="button" class="btn btn-petit" data-action="credit-renommer" data-id="${esc(cr.id)}">Renommer</button>
     <button type="button" class="btn btn-petit btn-danger" data-action="credit-supprimer" data-id="${esc(cr.id)}">Retirer</button></div>`).join('');
   return `<div class="sep"></div><div class="sous-titre">Crédits rattachés</div>${liste || '<p class="sous" style="margin-bottom:8px">Aucun crédit.</p>'}
@@ -1400,16 +1554,12 @@ function chargerSheetJS() {
 function sauverCompte(c) {
   const nom = $('#fc-nom').value.trim();
   const valeur = M.lireNombre($('#fc-valeur').value);
-  const taux = $('#fc-taux').value.trim() ? M.lireNombre($('#fc-taux').value) : null;
-  const versement = $('#fc-versement').value.trim() ? M.lireNombre($('#fc-versement').value) : null;
   if (!nom) return toast('Le nom est obligatoire.', 'erreur');
   if (valeur == null) return toast('Valeur invalide.', 'erreur');
-  if ($('#fc-taux').value.trim() && taux == null) return toast('Rendement invalide.', 'erreur');
-  if ($('#fc-versement').value.trim() && versement == null) return toast('Versement invalide.', 'erreur');
   const ordreMax = Math.max(-1, ...state.comptes.map(x => x.ordre ?? 0));
   const compte = Object.assign({ actif: true, ordre: ordreMax + 1 }, c || {}, {
     id: c ? c.id : nouvelId(), nom, type: $('#fc-type').value, proprietaire: $('#fc-prop').value,
-    groupe: $('#fc-groupe').value.trim(), valeur: M.r2(valeur), taux, versement,
+    groupe: $('#fc-groupe').value.trim(), valeur: M.r2(valeur),
   });
   ecrire(store.enregistrerCompte(compte)).catch(() => {});
   $('#dialogue').close();
@@ -1418,18 +1568,10 @@ function sauverCompte(c) {
 
 // ── Réglages ──────────────────────────────────────────────────────────
 function pageReglages() {
-  const obj = (state.reglages && state.reglages.objectif) || {};
   return `
     <div class="titre-page"><div><h1>Réglages</h1><p>Apogée ${VERSION_APP} · ${store.mode === 'local' ? 'mode local (ce navigateur)' : 'synchronisé avec Firebase'}</p></div></div>
     ${store.mode === 'local' ? `<div class="bandeau warn">Firebase n’est pas encore configuré : tes données sont enregistrées dans ce navigateur uniquement. Pense à exporter une sauvegarde.</div>` : ''}
     <div class="grille g-3">
-      <div class="carte"><h2>Objectif</h2>
-        <div class="champs" style="grid-template-columns:1fr 1fr">
-          <div class="champ"><label for="obj-montant">Montant (€)</label><input id="obj-montant" inputmode="decimal" value="${esc(saisie(obj.montant))}"></div>
-          <div class="champ"><label for="obj-annee">Année</label><input id="obj-annee" inputmode="numeric" maxlength="4" value="${esc(obj.annee || '')}"></div>
-        </div>
-        <div style="margin-top:12px;display:flex;justify-content:flex-end"><button class="btn btn-primaire btn-petit" data-action="objectif-sauver">Enregistrer</button></div>
-      </div>
       <div class="carte"><h2>Sauvegarde</h2>
         <p class="sous" style="margin-bottom:12px">${state.comptes.length} comptes · ${state.credits.length} crédits · ${state.snapshots.length} snapshots</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-action="exporter">Exporter (JSON)</button><button class="btn" data-action="importer">Importer…</button></div>
@@ -1478,12 +1620,29 @@ function importerFichier() {
   const inp = Object.assign(document.createElement('input'), { type: 'file', accept: '.json,application/json' });
   inp.onchange = async () => {
     const f = inp.files[0]; if (!f) return;
-    let d;
-    try { d = M.validerDonnees(JSON.parse(await f.text())); }
+    let d, brut;
+    try { brut = JSON.parse(await f.text()); } catch (e) { return toast('Import impossible : fichier JSON illisible.', 'erreur'); }
+    if (brut && brut.format === 'apogee-v2-credits') return completerCredits(brut);
+    try { d = M.validerDonnees(brut); }
     catch (e) { return toast('Import impossible : ' + e.message, 'erreur'); }
     remplacerDonnees(d, 'Importer cette sauvegarde ?', 'Importer');
   };
   inp.click();
+}
+// Fichier « complément » : ajoute le détail (intérêts, capital amorti) aux tableaux d'amortissement
+// existants, sans rien toucher d'autre. Refusé si le restant dû ne correspond pas mois par mois.
+async function completerCredits(fichier) {
+  const maj = [], ignores = [];
+  for (const c of fichier.credits || []) {
+    const ex = state.credits.find(x => x.id === c.id);
+    const parMois = new Map((ex ? ex.echeancier : []).map(e => [e.m, e.crd]));
+    const ok = ex && Array.isArray(c.echeancier) && c.echeancier.length === ex.echeancier.length && c.echeancier.every(e => parMois.has(e.m) && Math.abs(parMois.get(e.m) - e.crd) < 0.02);
+    if (ok) maj.push(Object.assign({}, ex, { echeancier: c.echeancier })); else ignores.push(c.nom || c.id);
+  }
+  if (!maj.length) return toast('Aucun crédit correspondant : rien n’a été modifié.', 'erreur');
+  if (!await confirmerSiNonSynchronise('Compléter les tableaux')) return;
+  if (!await confirmer('Compléter les tableaux d’amortissement ?', `Intérêts et capital remboursé ajoutés pour : <strong>${maj.map(c => esc(c.nom)).join(', ')}</strong>.${ignores.length ? `<br><br>Ignorés (ne correspondent pas) : ${ignores.map(esc).join(', ')}.` : ''}<br><br>Rien d’autre n’est modifié.`, 'Compléter')) return;
+  try { await Promise.all(maj.map(c => ecrire(store.enregistrerCredit(c)))); toast(`${maj.length} tableau${maj.length > 1 ? 'x' : ''} complété${maj.length > 1 ? 's' : ''}.`); } catch {}
 }
 async function afficherSauvegardes() {
   ui.sauvegardes = 'chargement'; rendre();
@@ -1617,17 +1776,18 @@ const actions = {
     if (ok) ecrire(store.supprimerCredit(cr.id)).catch(() => {});
     ouvrirCompte(cr.compteId);
   },
-  'sim-defaut': async () => {
-    if (!(await confirmer('Rétablir les valeurs par défaut ?', 'Les rendements et l’épargne des trois scénarios reprennent leurs valeurs d’origine.', 'Rétablir'))) return;
-    ecrire(store.enregistrerReglages({ simulation: null })).catch(() => {});
+  'hyp-ajouter': () => ouvrirHypothese(null),
+  'hyp-modifier': el => ouvrirHypothese(el.dataset.id),
+  'hyp-courbe': el => majHypotheses(l => l.map(h => h.id === el.dataset.id ? Object.assign(h, { visible: h.visible === false }) : h)),
+  'hyp-supprimer': async el => {
+    const h = M.hypotheses(state).find(x => x.id === el.dataset.id); if (!h) return;
+    if (await confirmer('Supprimer cette hypothèse ?', `« ${esc(h.nom || 'Hypothèse')} » et sa courbe seront retirées.`, 'Supprimer', true)) majHypotheses(l => l.filter(x => x.id !== h.id));
   },
-  'objectif-sauver': () => {
-    const montant = M.lireNombre($('#obj-montant').value), annee = parseInt($('#obj-annee').value, 10);
-    const vide = !$('#obj-montant').value.trim();
-    if (!vide && (montant == null || montant <= 0 || !(annee >= 2000 && annee < 2200))) return toast('Objectif invalide.', 'erreur');
-    ecrire(store.enregistrerReglages({ objectif: vide ? null : { montant, annee } })).catch(() => {});
-    toast(vide ? 'Objectif retiré.' : 'Objectif enregistré.');
-  },
+  'hyp-total': () => ecrire(store.enregistrerReglages({ totalHypotheses: (state.reglages || {}).totalHypotheses === false })).catch(() => {}),
+  'zoom-reinit': el => reinitZoom(el.dataset.graph, el.id),
+  'credit-tableau': el => ouvrirTableauCredit(el.dataset.id),
+  'fermer-tableau': () => $('#dlg-tableau').close(),
+
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
@@ -1641,7 +1801,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'maj-date' && ui.maj) { ui.maj.date = e.target.value || M.dateISO(); if (ui.maj.modifie) sauverBrouillon(); rendre(); }
-  if (ui.page === 'projection' && e.target.dataset && (e.target.dataset.sim || 'obj' in e.target.dataset)) surChangementProjection(e.target);
+  if (ui.page === 'projection' && e.target.dataset && 'obj' in e.target.dataset) surChangementProjection(e.target);
 });
 
 // Nouvelles données (chargement, autre appareil, écriture locale)
