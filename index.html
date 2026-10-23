@@ -615,6 +615,18 @@ function gainHypothese(h, mois) {
   if (apres > 0 && rm > 0) c *= Math.pow(1 + rm, apres);
   return r2(c);
 }
+// Total versé (sans les intérêts) à un mois donné : capital initial + mensualités + versements annuels.
+function verseHypothese(h, mois) {
+  const t = ecartMois(h.debut, mois);
+  if (t <= 0) return 0;
+  const actif = h.duree ? Math.min(t, Math.round(+h.duree * 12)) : t;
+  return r2((+h.montantInitial || 0) + (+h.versementMensuel || 0) * actif + (+h.versementAnnuel || 0) * Math.floor(actif / 12));
+}
+// Courbe d'une hypothèse seule : uniquement l'argent placé et ses intérêts (sans le patrimoine actuel).
+function courbeHypothese(base, h, filtre) {
+  const p = partHypothese(filtre);
+  return base.map(pt => ({ mois: pt.mois, k: pt.k, net: r2(p * gainHypothese(h, pt.mois)), verse: r2(p * verseHypothese(h, pt.mois)) }));
+}
 function hypotheses(state) {
   const l = state.reglages && state.reglages.hypotheses;
   return Array.isArray(l) ? l : [];
@@ -683,7 +695,7 @@ root.Model = { TYPES, CATEGORIES, PROPRIETAIRES, FILTRES, r2, part, dateISO, moi
   crdA, finCredit, dettesCompte, genererEcheancier, lireNombre, lireMois, parserTableauAmortissement,
   comptesActifs, parOrdre, situation, snapshotTotaux, historique, construireSnapshot,
   aDesHypotheses, croissance, projection, validerDonnees, exporter,
-  valeurFuture, gainHypothese, hypotheses, courbeAvecHypotheses, partHypothese, echeanceObjectif, trajectoireObjectif, detailEcheancier };
+  valeurFuture, gainHypothese, verseHypothese, courbeHypothese, hypotheses, courbeAvecHypotheses, partHypothese, echeanceObjectif, trajectoireObjectif, detailEcheancier };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 
@@ -1259,6 +1271,7 @@ const enteteZoom = (nom, id) => window.ChartZoom ? `<div class="zoom-barre"><spa
 function etiquetteAvecEcart(traj, mois) {
   return c => {
     let t = ` ${c.dataset.label} : ${eur(c.parsed.y)}`;
+    if (c.dataset.verse) { const v = c.dataset.verse[c.dataIndex]; if (v != null) return t + ` (versé ${eur(v)} + intérêts ${eur(c.parsed.y - v)})`; }
     if (traj && !c.dataset.estObjectif) { const o = traj.valeurA(mois[c.dataIndex]); if (o != null) t += ` (${eurSigne(c.parsed.y - o)} vs objectif)`; }
     return t;
   };
@@ -1274,8 +1287,9 @@ function courbesProjection() {
   const base = M.projection(state, ui.filtre, ui.horizon * 12);
   const hyps = M.hypotheses(state);
   const courbes = [{ id: 'base', nom: 'Projection de base', couleur: '--text3', tirets: true, pts: base }];
-  hyps.forEach((h, i) => { if (h.visible !== false) courbes.push({ id: h.id, nom: h.nom || `Hypothèse ${i + 1}`, couleur: couleurHyp(i), pts: M.courbeAvecHypotheses(base, [h], ui.filtre) }); });
-  if (hyps.length > 1 && (state.reglages || {}).totalHypotheses !== false) courbes.push({ id: 'total', nom: 'Avec toutes les hypothèses', couleur: '--text', epais: true, pts: M.courbeAvecHypotheses(base, hyps, ui.filtre) });
+  if (hyps.length && (state.reglages || {}).totalHypotheses !== false) courbes.push({ id: 'total', nom: 'Total avec hypothèses', couleur: '--text', epais: true, pts: M.courbeAvecHypotheses(base, hyps, ui.filtre) });
+  // Chaque hypothèse seule : l'argent placé et ses intérêts, sans le patrimoine actuel
+  hyps.forEach((h, i) => { if (h.visible !== false) courbes.push({ id: h.id, nom: h.nom || `Hypothèse ${i + 1}`, couleur: couleurHyp(i), seule: true, tirets: true, pts: M.courbeHypothese(base, h, ui.filtre) }); });
   return courbes;
 }
 // Écart du dernier snapshot à la trajectoire (vue Couple).
@@ -1330,13 +1344,13 @@ function pageProjection() {
       </div>
     </div>
     <div class="carte"><h2>Résultats</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Courbe</th>${ks.map(k => `<th class="d">${libK(k)}</th>`).join('')}${traj && couple ? '<th class="d">Objectif</th>' : ''}</tr></thead><tbody>
-        ${courbes.map(c => `<tr><td><span class="nom-serie">${pastille(c.couleur)}${esc(c.nom)}</span></td>${ks.map(k => `<td class="d num">${eur(c.pts[k].net)}</td>`).join('')}${traj && couple ? `<td class="d">${atteinte(c)}</td>` : ''}</tr>`).join('')}
+        ${courbes.map(c => `<tr><td><span class="nom-serie">${pastille(c.couleur)}${esc(c.nom)}</span></td>${ks.map(k => `<td class="d num">${eur(c.pts[k].net)}</td>`).join('')}${traj && couple ? `<td class="d">${c.seule ? '<span class="muted">—</span>' : atteinte(c)}</td>` : ''}</tr>`).join('')}
       </tbody></table></div>
-      <p class="sous" style="margin-top:10px">Projection de base : valeurs actuelles figées, seuls tes crédits se remboursent.${hyps.length ? ' Les hypothèses s’y ajoutent.' : ''}</p></div>
+      <p class="sous" style="margin-top:10px">Projection de base : valeurs actuelles figées, seuls tes crédits se remboursent.${hyps.length ? ' Total avec hypothèses : projection de base + toutes les hypothèses. Chaque hypothèse (pointillés) : uniquement l’argent placé et ses intérêts.' : ''}</p></div>
     <div class="carte"><div class="carte-titre"><h2>Hypothèses de placement</h2><button class="btn btn-petit btn-primaire" data-action="hyp-ajouter">+ Nouvelle hypothèse</button></div>
       ${hyps.length ? `<div class="tab-scroll"><table class="tab"><thead><tr><th>Nom</th><th>Début</th><th class="d">Capital initial</th><th class="d">Versements</th><th class="d">Rendement</th><th class="d">Durée</th><th></th></tr></thead><tbody>${lignesHyp}</tbody></table></div>
-        ${hyps.length > 1 ? `<label class="case-total"><input type="checkbox" data-action="hyp-total" ${(state.reglages || {}).totalHypotheses !== false ? 'checked' : ''}> Afficher aussi la courbe « Avec toutes les hypothèses »</label>` : ''}
-        <p class="sous" style="margin-top:10px">Chaque courbe = projection de base + l’hypothèse. Capitalisation mensuelle ; après la durée, plus de versement mais le capital continue de rapporter.${ui.filtre !== 'foyer' ? ' En vue individuelle, la moitié est comptée.' : ''}</p>`
+        <label class="case-total"><input type="checkbox" data-action="hyp-total" ${(state.reglages || {}).totalHypotheses !== false ? 'checked' : ''}> Afficher la courbe « Total avec hypothèses » (projection de base + toutes les hypothèses)</label>
+        <p class="sous" style="margin-top:10px">La courbe de chaque hypothèse montre seulement l’argent placé et ses intérêts. Intérêts composés chaque mois ; versement mensuel chaque mois et versement annuel une fois par an (à la fin de chaque année) ; après la durée, plus de versement mais le capital continue de rapporter.${ui.filtre !== 'foyer' ? ' En vue individuelle, la moitié est comptée.' : ''}</p>`
         : '<p class="sous">Aucune hypothèse. Exemple : « ETF World, 500 €/mois à 6 %/an à partir de janvier ». Chaque hypothèse a sa propre courbe, que tu affiches ou non.</p>'}
     </div>
     ${finsCredits.length ? `<div class="carte"><h2>Fin des crédits</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Crédit</th><th class="d">Restant dû</th><th class="d">Fin</th><th></th></tr></thead><tbody>
@@ -1371,7 +1385,8 @@ function graphProjection() {
   }
   courbes.forEach(c => {
     const coul = css(c.couleur);
-    datasets.push({ label: c.nom, data: serie(c.pts), borderColor: coul, backgroundColor: coul, borderWidth: c.epais ? 2.5 : 2, borderDash: c.tirets ? [6, 4] : [], tension: .1 });
+    const verse = c.seule ? (() => { const m = new Map(c.pts.map(p => [p.mois, p.verse])); return mois.map(x => m.has(x) ? m.get(x) : null); })() : null;
+    datasets.push({ label: c.nom, verse, data: serie(c.pts), borderColor: coul, backgroundColor: coul, borderWidth: c.epais ? 2.5 : 2, borderDash: c.tirets ? [6, 4] : [], tension: .1 });
   });
   charts.proj = new Chart(el, { type: 'line', data: { labels: mois.map(moisFr), datasets }, options: opts });
 }
