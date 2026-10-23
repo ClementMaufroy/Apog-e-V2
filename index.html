@@ -212,6 +212,11 @@ dialog.dlg-large{width:min(720px,calc(100vw - 24px))}
 .tableau-credit thead th{position:sticky;top:0;background:var(--surface);z-index:1}
 .tableau-credit tr.passe td{color:var(--text3)}
 .tableau-credit tr.courant td{background:var(--accent-soft);font-weight:600}
+.obj-ligne{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:24px;align-items:start}
+.obj-champs{grid-template-columns:1.3fr 1fr}
+.obj-texte .obj-phrase{margin-top:2px}
+.obj-texte .ecart-obj{max-width:520px}
+@media (max-width:760px){.obj-ligne{grid-template-columns:minmax(0,1fr);gap:12px}}
 .g-proj{grid-template-columns:minmax(0,1fr) minmax(0,2fr);margin:16px 0;align-items:stretch}
 .g-proj>.carte{margin:0}
 @media (max-width:900px){.g-proj{grid-template-columns:minmax(0,1fr)}}
@@ -1315,19 +1320,19 @@ function pageProjection() {
     <div class="titre-page"><div><h1>Projection</h1><p>Vue ${esc(filtreLib())} · à partir de ton patrimoine net d’aujourd’hui</p></div>
       <div class="segment" role="group" aria-label="Horizon">${[5, 10, 20, 30].map(h => `<button data-action="horizon" data-h="${h}" class="${ui.horizon === h ? 'actif' : ''}">${h} ans</button>`).join('')}</div></div>
     <div class="carte">${enteteZoom('proj', 'zoom-proj')}<div class="graph-grand"><canvas id="g-proj"></canvas></div></div>
-    <div class="grille g-proj">
-      <div class="carte"><h2>Objectif</h2>
-        <div class="champs" style="grid-template-columns:1.3fr 1fr">
+    <div class="carte carte-objectif"><h2>Objectif</h2>
+      <div class="obj-ligne">
+        <div class="champs obj-champs">
           <div class="champ"><label for="pobj-montant">Montant (€)</label><input id="pobj-montant" data-obj inputmode="decimal" value="${esc(obj ? saisie(obj.montant) : '')}" placeholder="Ex : 1 000 000"></div>
           <div class="champ"><label for="pobj-echeance">Échéance</label><input id="pobj-echeance" data-obj type="month" value="${esc(obj ? M.echeanceObjectif(obj) : '')}"></div>
         </div>
-        <div style="margin-top:12px">${texteObj}</div>
+        <div class="obj-texte">${texteObj}</div>
       </div>
-      <div class="carte"><h2>Résultats</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Courbe</th>${ks.map(k => `<th class="d">${libK(k)}</th>`).join('')}${traj && couple ? '<th class="d">Objectif</th>' : ''}</tr></thead><tbody>
+    </div>
+    <div class="carte"><h2>Résultats</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Courbe</th>${ks.map(k => `<th class="d">${libK(k)}</th>`).join('')}${traj && couple ? '<th class="d">Objectif</th>' : ''}</tr></thead><tbody>
         ${courbes.map(c => `<tr><td><span class="nom-serie">${pastille(c.couleur)}${esc(c.nom)}</span></td>${ks.map(k => `<td class="d num">${eur(c.pts[k].net)}</td>`).join('')}${traj && couple ? `<td class="d">${atteinte(c)}</td>` : ''}</tr>`).join('')}
       </tbody></table></div>
       <p class="sous" style="margin-top:10px">Projection de base : valeurs actuelles figées, seuls tes crédits se remboursent.${hyps.length ? ' Les hypothèses s’y ajoutent.' : ''}</p></div>
-    </div>
     <div class="carte"><div class="carte-titre"><h2>Hypothèses de placement</h2><button class="btn btn-petit btn-primaire" data-action="hyp-ajouter">+ Nouvelle hypothèse</button></div>
       ${hyps.length ? `<div class="tab-scroll"><table class="tab"><thead><tr><th>Nom</th><th>Début</th><th class="d">Capital initial</th><th class="d">Versements</th><th class="d">Rendement</th><th class="d">Durée</th><th></th></tr></thead><tbody>${lignesHyp}</tbody></table></div>
         ${hyps.length > 1 ? `<label class="case-total"><input type="checkbox" data-action="hyp-total" ${(state.reglages || {}).totalHypotheses !== false ? 'checked' : ''}> Afficher aussi la courbe « Avec toutes les hypothèses »</label>` : ''}
