@@ -579,13 +579,15 @@ function valeurFuture(v, vm, t, k) {
   const f = Math.pow(1 + r, k);
   return v * f + vm * (f - 1) / r;
 }
-// Taux et versement propres à un compte (anciennes données ; plus saisis dans l'interface).
+// Rendement annuel propre à un compte (taux effectif) : valeur × (1 + t)^années.
+// Ex. 275 000 € à 0,76 %/an → 275 000 × 1,0076^20 ≈ 319 960 € dans 20 ans.
 function croissance(c, k) {
   const v = +c.valeur || 0, t = +c.taux || 0, vm = +c.versement || 0;
   if (!t && !vm) return v;
   return valeurFuture(v, vm, t, k);
 }
-// Projection de base : valeurs actuelles figées, seuls les crédits se remboursent.
+// Projection de base : valeur actuelle de chaque compte, augmentée de son rendement annuel s'il en a un,
+// moins le restant dû des crédits à chaque date.
 // k = 0 correspond exactement à la situation du jour : la courbe part du net réel.
 function projection(state, filtre, horizonMois, iso = dateISO()) {
   const m0 = moisDe(iso), comptes = comptesActifs(state), pts = [];
@@ -1361,7 +1363,7 @@ function pageProjection() {
     <div class="carte"><h2>Résultats</h2><div class="tab-scroll"><table class="tab"><thead><tr><th>Courbe</th>${ks.map(k => `<th class="d">${libK(k)}</th>`).join('')}${traj && couple ? '<th class="d">Objectif</th>' : ''}</tr></thead><tbody>
         ${courbes.map(c => `<tr><td><span class="nom-serie">${pastille(c.couleur)}${esc(c.nom)}</span></td>${ks.map(k => `<td class="d num">${eur(c.pts[k].net)}</td>`).join('')}${traj && couple ? `<td class="d">${c.seule ? '<span class="muted">—</span>' : atteinte(c)}</td>` : ''}</tr>`).join('')}
       </tbody></table></div>
-      <p class="sous" style="margin-top:10px">Projection de base : valeurs actuelles figées, seuls tes crédits se remboursent.${hyps.length ? ' Total avec hypothèses : projection de base + toutes les hypothèses. Chaque hypothèse (pointillés) : uniquement l’argent placé et ses intérêts.' : ''}</p></div>
+      <p class="sous" style="margin-top:10px">Projection de base : valeur actuelle de tes comptes, avec leur rendement annuel quand tu en as saisi un (page Comptes), moins le restant dû de tes crédits.${hyps.length ? ' Total avec hypothèses : projection de base + toutes les hypothèses. Chaque hypothèse (pointillés) : uniquement l’argent placé et ses intérêts.' : ''}</p></div>
     <div class="carte"><div class="carte-titre"><h2>Hypothèses de placement</h2><button class="btn btn-petit btn-primaire" data-action="hyp-ajouter">+ Nouvelle hypothèse</button></div>
       ${hyps.length ? `<div class="tab-scroll"><table class="tab"><thead><tr><th title="Prise en compte dans les courbes et les résultats">Active</th><th>Nom</th><th>Début</th><th class="d">Capital initial</th><th class="d">Versements</th><th class="d">Rendement</th><th class="d">Durée</th><th></th></tr></thead><tbody>${lignesHyp}</tbody></table></div>
         <label class="case-total"><input type="checkbox" data-action="hyp-total" ${(state.reglages || {}).totalHypotheses !== false ? 'checked' : ''}> Afficher la courbe « Total avec hypothèses » (projection de base + toutes les hypothèses)</label>
@@ -1489,7 +1491,7 @@ function pageComptes() {
   const cols = `<colgroup><col style="width:${avecPart ? 28 : 32}%"><col class="cache-mobile" style="width:16%"><col style="width:14%"><col class="cache-mobile" style="width:14%"><col style="width:14%">${avecPart ? '<col style="width:12%">' : ''}<col style="width:10%"></colgroup>`;
   const tableau = liste => `<div class="tab-scroll"><table class="tab tab-comptes">${cols}<thead><tr><th>Compte</th><th class="cache-mobile">Type</th><th class="d">Valeur</th><th class="d cache-mobile">Crédits</th><th class="d">Net</th>${avecPart ? `<th class="d">Part ${esc(filtreLib())}</th>` : ''}<th></th></tr></thead><tbody>
     ${liste.map(c => { const l = parId.get(c.id); return `<tr class="${avecPart && !l.part ? 'estompe' : ''}">
-      <td><div class="nom-compte">${esc(c.nom)}</div><div class="sous">${esc(c.groupe || '')}</div></td>
+      <td><div class="nom-compte">${esc(c.nom)}</div><div class="sous">${[c.groupe ? esc(c.groupe) : '', +c.taux ? `<span class="pos">${esc(nombreFr(c.taux))} %/an</span>` : ''].filter(Boolean).join(' · ')}</div></td>
       <td class="cache-mobile text2">${esc(typeLib(c.type))}</td>
       <td class="d num">${eur(l.brut, 2)}</td>
       <td class="d num cache-mobile ${l.dettes ? 'neg' : 'muted'}">${l.dettes ? '−' + eur(l.dettes, 2) : '—'}</td>
@@ -1525,6 +1527,7 @@ function ouvrirCompte(id) {
         <div class="champ"><label for="fc-prop">Propriétaire</label><select id="fc-prop">${opt({ clement: 'Clément', alexandre: 'Alexandre', couple: 'Couple (50/50)' }, c ? c.proprietaire : 'clement')}</select></div>
         <div class="champ"><label for="fc-valeur" id="fc-valeur-lib">Valeur actuelle (€)</label><input id="fc-valeur" inputmode="decimal" required value="${esc(c ? saisie(c.valeur) : '')}"></div>
         <div class="champ"><label for="fc-groupe">Groupe (facultatif)</label><input id="fc-groupe" list="fc-groupes" maxlength="60" value="${esc(c ? c.groupe || '' : '')}" placeholder="Ex : SCI des Prêles"><datalist id="fc-groupes">${groupes.map(g => `<option value="${esc(g)}">`).join('')}</datalist></div>
+        <div class="champ"><label for="fc-taux">Rendement annuel (%) <span class="muted" style="font-weight:400">facultatif</span></label><input id="fc-taux" inputmode="decimal" value="${esc(c && c.taux != null ? saisie(c.taux) : '')}" placeholder="Vide = valeur figée"><span class="aide" id="fc-taux-aide"></span></div>
       </div>
       <div id="fc-credits"></div>
     </div>
@@ -1541,7 +1544,7 @@ function ouvrirCompte(id) {
   };
   $('#fc-type').onchange = majType; majType();
   $('#f-compte').onsubmit = e => { e.preventDefault(); sauverCompte(c); };
-  dlg.showModal();
+  dlg.showModal(); apercuRendement();
 }
 function blocCredits(c) {
   if (!c) return `<div class="sep"></div><p class="sous">Enregistre d’abord le compte, puis rouvre-le pour rattacher ses crédits.</p>`;
@@ -1607,15 +1610,22 @@ function chargerSheetJS() {
     document.head.appendChild(s);
   });
 }
+function apercuRendement() {
+  const aide = $('#fc-taux-aide'); if (!aide) return;
+  const v = M.lireNombre($('#fc-valeur').value), t = M.lireNombre($('#fc-taux').value);
+  aide.textContent = v != null && t ? `Soit ${eur(v * Math.pow(1 + t / 100, 10))} dans 10 ans, ${eur(v * Math.pow(1 + t / 100, 20))} dans 20 ans.` : '';
+}
 function sauverCompte(c) {
   const nom = $('#fc-nom').value.trim();
   const valeur = M.lireNombre($('#fc-valeur').value);
   if (!nom) return toast('Le nom est obligatoire.', 'erreur');
   if (valeur == null) return toast('Valeur invalide.', 'erreur');
+  const tauxTxt = $('#fc-taux').value.trim(), taux = tauxTxt ? M.lireNombre(tauxTxt) : null;
+  if (tauxTxt && (taux == null || taux < -50 || taux > 50)) return toast('Rendement invalide (entre −50 et 50 %).', 'erreur');
   const ordreMax = Math.max(-1, ...state.comptes.map(x => x.ordre ?? 0));
   const compte = Object.assign({ actif: true, ordre: ordreMax + 1 }, c || {}, {
     id: c ? c.id : nouvelId(), nom, type: $('#fc-type').value, proprietaire: $('#fc-prop').value,
-    groupe: $('#fc-groupe').value.trim(), valeur: M.r2(valeur),
+    groupe: $('#fc-groupe').value.trim(), valeur: M.r2(valeur), taux,
   });
   ecrire(store.enregistrerCompte(compte)).catch(() => {});
   $('#dialogue').close();
@@ -1864,6 +1874,7 @@ document.addEventListener('click', e => {
   if (f) { ui.filtre = f.dataset.filtre; setPref('filtre', ui.filtre); rendre(); }
 });
 document.addEventListener('input', e => {
+  if (e.target.id === 'fc-taux' || e.target.id === 'fc-valeur') apercuRendement();
   const id = e.target.dataset && e.target.dataset.maj;
   if (id && ui.maj) { ui.maj.valeurs[id] = e.target.value; ui.maj.modifie = true; sauverBrouillon(); rafraichirMaj(); }
 });
